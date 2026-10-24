@@ -66,28 +66,34 @@ def metriche(rk):
             "arp": (sum(tro) / len(tro)) if tro else None}
 
 
-def testi(job, f, mm_, ma, lost):
-    """testi del foglio: generati dai numeri e dalla frase della zona, uguali per ogni settore"""
+def testi(job, f, mm_, ma, lost, debole):
+    """testi del foglio: generati dai numeri e dalla frase della zona, uguali per ogni settore.
+    debole = "ai" o "maps": il titolo parla della piattaforma in cui l'attività è più indietro"""
     N, a, b = mm_["N"], mm_["top3"], ma["top3"]
-    fuori = N - b
     chi = esc(job.get("frase_kw") or f"«{job.get('keyword', '')}»")
-    if fuori:
-        titolo = (f"Nelle risposte di Google AI Mode, in <font color='#C5221F'>{fuori} zone su {N}</font> "
-                  f"chi cerca {chi} trova prima i vostri concorrenti")
-    else:
-        titolo = f"Nelle risposte di Google AI Mode siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
     ai = "AI Mode è la ricerca in cui risponde l’intelligenza artificiale di Google. "
-    if a == 0 and b == 0: sub = ai + "Oggi non siete tra i primi 3 in nessuna zona, né su Maps né su AI Mode."
-    else: sub = ai + f"Su Maps siete tra i primi 3 in {a} zone, su AI Mode {'solo ' if b < a else ''}in {b}."
+    if debole == "ai":
+        fuori = N - b
+        dove, altrove = "Nelle risposte di Google AI Mode", "l’intelligenza artificiale di Google"
+        sub = ai + (f"Oggi non siete tra i primi 3 in nessuna zona, né su Maps né su AI Mode." if a == 0 and b == 0
+                    else f"Su Maps siete tra i primi 3 in {a} zone, su AI Mode {'solo ' if b < a else ''}in {b}.")
+        perse_txt = (f"In {lost} di queste {fuori} zone ({pc(lost, N)}) Google Maps vi mette tra i primi 3. "
+                     "Chi cerca con l’intelligenza artificiale di Google, invece, vede prima i concorrenti. "
+                     "Sulla mappa AI Mode sono i pallini tratteggiati.")
+    else:
+        fuori = N - a
+        dove, altrove = "Su Google Maps", "Google Maps"
+        sub = ai + f"Lì siete tra i primi 3 in {b} zone, su Google Maps solo in {a}."
+        perse_txt = (f"In {lost} di queste {fuori} zone ({pc(lost, N)}) l’intelligenza artificiale di Google vi mette tra i primi 3. "
+                     "Su Google Maps, invece, chi cerca vede prima i concorrenti. Sulla mappa Maps sono i pallini tratteggiati.")
+    if fuori:
+        titolo = f"{dove}, in <font color='#C5221F'>{fuori} zone su {N}</font> chi cerca {chi} trova prima i vostri concorrenti"
+    else:
+        titolo = f"{dove} siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
     lettura = (f"Ogni pallino è una delle {N} zone di un quadrato di {esc(job.get('lato', '')).replace(' ', '')} "
                f"centrato {esc(job.get('centrata', ''))}. Il numero è la posizione in cui Google vi mostra a chi cerca da lì; "
                f"il rombo nero è la vostra sede.")
-    if lost:
-        rischio = (lost, f"In {lost} di queste {fuori} zone ({pc(lost, N)}) Google Maps vi mette tra i primi 3. "
-                   "Chi cerca con l’intelligenza artificiale di Google, invece, vede prima i concorrenti. "
-                   "Sulla mappa sono i pallini tratteggiati.")
-    else:
-        rischio = (fuori, f"in cui l’intelligenza artificiale di Google mostra prima i concorrenti ({pc(fuori, N)}).")
+    rischio = (lost, perse_txt) if lost else (fuori, f"in cui {altrove} mostra prima i concorrenti ({pc(fuori, N)}).")
     perche = "In ogni zona fuori dai primi 3, chi cerca chiama prima un concorrente. Finché la situazione resta questa, quelle ricerche vanno agli altri."
     invito = ("Prossimo passo", "Vi mostro l’analisi completa",
               "In un incontro guardiamo zona per zona chi vi passa davanti e parliamo delle azioni correttive per migliorare il vostro posizionamento nel tempo.")
@@ -158,9 +164,12 @@ def pagina(c, job, f, bg, firma):
     punti, pai = job["punti"], job["punti_ai"]
     rkm, rka = ranghi(punti, f["pid"]), ranghi(pai, f["pid"])
     mm_, ma = metriche(rkm), metriche(rka)
-    perso = [bool(m and m <= 3 and not (a and a <= 3)) for m, a in zip(rkm, rka)]
+    # piattaforma debole: quella con meno zone tra i primi 3 (a parità, AI Mode)
+    debole = "maps" if mm_["top3"] < ma["top3"] else "ai"
+    forte_r, debole_r = (rka, rkm) if debole == "maps" else (rkm, rka)
+    perso = [bool(x and x <= 3 and not (y and y <= 3)) for x, y in zip(forte_r, debole_r)]
     lost = sum(perso)
-    T = testi(job, f, mm_, ma, lost)
+    T = testi(job, f, mm_, ma, lost, debole)
     top = H - MT
     # --- testata: a sinistra data, nome e indirizzo; a destra la ricerca
     c.setFillColor(OKAC); c.rect(ML, top - 2.4 * mm, 6 * mm, .6 * mm, stroke=0, fill=1)
@@ -205,8 +214,8 @@ def pagina(c, job, f, bg, firma):
     xm = ML
     sede = (f.get("lat"), f.get("lng"))
     for i, (lab, sub, pts, rk, m, segna) in enumerate([
-            ("Google Maps", "la mappa di Google", punti, rkm, mm_, None),
-            ("Google AI Mode", "le risposte dell’intelligenza artificiale", pai, rka, ma, lambda j: perso[j])]):
+            ("Google Maps", "la mappa di Google", punti, rkm, mm_, (lambda j: perso[j]) if debole == "maps" else None),
+            ("Google AI Mode", "le risposte dell’intelligenza artificiale", pai, rka, ma, (lambda j: perso[j]) if debole == "ai" else None)]):
         x = xm + i * (S + gap)
         spaced(c, x, y - 3 * mm, lab, "MOB", 8.6, INK, .1)
         c.setFillColor(MUTE); c.setFont("P", 8.2); c.drawString(x, y - 7 * mm, sub)
@@ -223,7 +232,7 @@ def pagina(c, job, f, bg, firma):
             c.drawString(tx, cy - 4.4 * mm, f"posizione media {ord_f(m['arp'])}" + (" dove comparite" if m["found"] < m["N"] else ""))
         miss = m["N"] - m["top3"]
         if miss:
-            t = f"in {miss} zone non siete tra i primi 3 ({100 - su(m['top3'] / m['N'] * 100)}%)"
+            t = f"in {miss} zone non siete tra i primi 3 ({100 - su(m['top3'] / m['N'] * 100)}%)"   # complementare all'anello
             w = c.stringWidth(t, "P-B", 8.4) + 3.2 * mm
             c.setFillColor(NEGBG); c.roundRect(tx - 1.2 * mm, cy - 10.6 * mm, w, 4.8 * mm, 1 * mm, stroke=0, fill=1)
             c.setFillColor(NEGTX); c.setFont("P-B", 8.4); c.drawString(tx + .4 * mm, cy - 9.2 * mm, t)
