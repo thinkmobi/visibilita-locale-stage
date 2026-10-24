@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.16.0';
+const VERSIONE = '0.17.0';
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
 const CHIUSI = ['Vinto', 'Perso', 'Scartato'];
 // nomi vecchi degli stati: si leggono ancora e diventano quelli nuovi al primo salvataggio della zona
@@ -802,7 +802,8 @@ function vGiro() {
       ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}. Porta per loro la mappa della zona o un'analisi a parte.</div>` : ''}`;
     })()}
     <div class="sub">Il PDF esce nell'ordine del giro: taglia la risma a metà e metti la pila inferiore sotto quella superiore.</div>
-    <div class="row mt"><button class="btn pri" data-stampa="${zid}" ${ST.pdf[zid] ? 'disabled' : ''}>Genera PDF</button><span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div></div>`; }).join('') || '<div class="vuoto">Nessuna tappa in questa data. Aggiungila con “+ Tappa”.</div>'}`;
+    <div class="row mt"><button class="btn pri" data-stampa="${zid}" ${ST.pdf[zid] ? 'disabled' : ''}>Genera PDF</button><button class="btn" data-fogli="${zid}" ${ST.pdf[zid] || !L.haAI(ST.zone[zid].z) ? 'disabled' : ''}>Fogli da lasciare</button><span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div>
+    <div class="sub">${L.haAI(ST.zone[zid].z) ? 'Fogli da lasciare: uno per tappa, A4 orizzontale, Google Maps contro AI Mode.' : 'Fogli da lasciare non disponibili: manca la scansione AI Mode della zona (Zone → Nuova zona, stessa report key Maps più quella AI Mode).'}</div></div>`; }).join('') || '<div class="vuoto">Nessuna tappa in questa data. Aggiungila con “+ Tappa”.</div>'}`;
 }
 /* sposta in blocco le tappe di un giro a un'altra data: tutte o solo quelle scelte */
 function formSpostaGiro() {
@@ -865,24 +866,26 @@ function scegliTappa() {
     aggiorna(zid, id, { giro: { data: ST.giroData, ordine: prossimoOrdine(zid, ST.giroData), orario: '', fatto: false } }); b.remove(); toast('Aggiunto');
   });
 }
-async function generaPdf(zid) {
+async function generaPdf(zid, tipo = 'giro') {
   if (ST.pdf[zid]) return;   // una richiesta alla volta per zona
   // lo stato vive in ST: se la vista si ricostruisce durante l'attesa il messaggio e il pulsante "Apri" restano
   const out = { set textContent(t) { scrivi(esc(t)); }, set innerHTML(h) { scrivi(h); } };
   const scrivi = (h) => { ST.pdfMsg[zid] = h; const o = $('#st-' + zid); if (o) o.innerHTML = h; };
-  const blocca = (on) => { ST.pdf[zid] = on; const b = document.querySelector(`[data-stampa="${zid}"]`); if (b) b.disabled = on; };
+  const blocca = (on) => { ST.pdf[zid] = on; document.querySelectorAll(`[data-stampa="${zid}"],[data-fogli="${zid}"]`).forEach((b) => { b.disabled = on || (b.dataset.fogli && !L.haAI(ST.zone[zid].z)); }); };
   if (!GH.ok()) { toast('Serve il collegamento GitHub'); return; }
   const z = ST.zone[zid].z;
   const ps = tutti().filter((x) => x.zid === zid && x.p.giro && x.p.giro.data === ST.giroData && x.p.pid && z.attivita[x.p.pid] && !(x.p.report && x.p.report.includi === false))
     .sort((a, b) => (a.p.giro.ordine || 99) - (b.p.giro.ordine || 99)).map((x) => x.p);
   if (!ps.length) { toast('Nessuna analisi da stampare'); return; }
-  const job = L.jobStampa(z, ps, { data: z.meta.data, firma: ST.conf.firma && ST.conf.firma.nome ? ST.conf.firma : null });
+  const firma = ST.conf.firma && ST.conf.firma.nome ? ST.conf.firma : null;
+  if (tipo === 'fogli' && !L.haAI(z)) { toast('Manca la scansione AI Mode della zona'); return; }
+  const job = tipo === 'fogli' ? L.jobFogli(z, ps, { data: oggi(), firma }) : L.jobStampa(z, ps, { data: z.meta.data, firma });
   blocca(true);
   try {
     out.textContent = 'Invio…';
     await invia(zid);
     const sha = await GH.sha(`zone/${zid}/stampa.json`);
-    await GH.putJSON(`zone/${zid}/stampa.json`, job, sha, `Stampa giro ${ST.giroData}`);
+    await GH.putJSON(`zone/${zid}/stampa.json`, job, sha, tipo === 'fogli' ? `Fogli da lasciare ${ST.giroData}` : `Stampa giro ${ST.giroData}`);
     out.textContent = 'In generazione (circa un minuto)…';
     const t0 = ora();
     // attesa breve che si interrompe quando l'app torna in primo piano: il controllo riparte subito
@@ -900,7 +903,7 @@ async function generaPdf(zid) {
         if (e.data.errore) { out.innerHTML = `<span class="c-neg">${esc(e.data.errore)}</span>`; return; }
         const av = (e.data.avvisi || []).map((a) => `<div class="avviso">${esc(a)}</div>`).join('');
         out.innerHTML = `<button class="btn mini ink" data-pdf="${zid}|${esc(e.data.file)}">Apri ${esc(e.data.file.split('/').pop())}</button>${av}`;
-        const za = ST.zone[zid].z; ps.forEach((p0) => { const p = za.prospect[p0.id]; if (p && !p.report_prodotto) { p.report_prodotto = oggi(); tocca(p, 'report_prodotto'); } }); modificato(zid);
+        const za = ST.zone[zid].z; if (tipo === 'giro') ps.forEach((p0) => { const p = za.prospect[p0.id]; if (p && !p.report_prodotto) { p.report_prodotto = oggi(); tocca(p, 'report_prodotto'); } }); modificato(zid);
         return;
       }
     }
@@ -938,7 +941,7 @@ function apriZona(zid) {
     .filter((r) => !ST.f.soloNuove || !giaP.has(r.pid))
     .sort((x, y) => ord === 'rv' ? (y.a.rv || 0) - (x.a.rv || 0) : ord === 'nome' ? x.a.n.localeCompare(y.a.n) : (y.m[ord] - x.m[ord]) || ((y.a.rv || 0) - (x.a.rv || 0)));
   const f = apriFoglio(`${z.meta.quartiere} · ${z.meta.keyword}`, `
-  <div class="sub">Rilevazione del ${esc(z.meta.data_testo)} · griglia ${esc(z.meta.lato)} · ${(z.punti || []).length} punti</div>
+  <div class="sub">Rilevazione del ${esc(z.meta.data_testo)} · griglia ${esc(z.meta.lato)} · ${(z.punti || []).length} punti · ${L.haAI(z) ? 'AI Mode importato' : 'AI Mode assente'}</div>
   <div class="sub mt">${s.siti && s.siti.aggiornato ? `Siti controllati il ${oraRoma(s.siti.aggiornato, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${Object.values(s.siti.siti).filter((v) => STATO_SITO[v.stato]).length} non funzionanti su ${Object.keys(s.siti.siti).length}` : 'Siti non ancora controllati'}</div>
   <div class="row mt"><button class="btn mini" id="zSiti">Ricontrolla siti</button><button class="btn mini" id="zPdf">Ultimo PDF</button><button class="btn mini" id="zTesti">Testi della zona</button><button class="btn mini" id="zEsporta">Esporta CSV</button></div>
   <div class="eb">Attività trovate</div>
@@ -996,6 +999,7 @@ function formScansione() {
   const f = apriFoglio('Nuova zona da Local Falcon', `
   <p class="sub">Esegui la scansione su Local Falcon (griglia 7×7 centrata sul quartiere, keyword = sola categoria), poi incolla qui la chiave del report: l'import gira su GitHub, senza consumare Claude.</p>
   <label class="f">Report key (15 caratteri, dall'URL del report)<input id="nk" placeholder="es. e01e001722b17ba" autocapitalize="off"></label>
+  <label class="f">Report key AI Mode (facoltativa: stessa griglia e stesso centro, serve ai fogli da lasciare)<input id="nka" placeholder="es. 77b843f6a1547d5" autocapitalize="off"></label>
   <div class="due"><label class="f">Quartiere<input id="nq" placeholder="San Salvario"></label><label class="f">Città<input id="nc" value="Torino"></label></div>
   <div class="due"><label class="f">Categoria per il nome file<input id="ncat" placeholder="Farmacie"></label><label class="f">Riferimento<select id="nl">${L.LUOGHI.map((l) => `<option>${l}</option>`).join('')}</select></label></div>
   <label class="f">Chi cerca… (frase nei titoli)<input id="nf" placeholder="una farmacia"></label>
@@ -1004,13 +1008,15 @@ function formScansione() {
   $('#nInvia', f).onclick = async () => {
     const k = $('#nk').value.trim().toLowerCase(); const q = $('#nq').value.trim();
     if (!/^[a-f0-9]{15}$/.test(k)) { toast('La report key ha 15 caratteri esadecimali'); return; }
+    const ka = $('#nka').value.trim().toLowerCase();
+    if (ka && (!/^[a-f0-9]{15}$/.test(ka) || ka === k)) { toast('La report key AI Mode ha 15 caratteri esadecimali ed è diversa da quella Maps'); return; }
     if (!q || !GH.ok()) { toast(GH.ok() ? 'Manca il quartiere' : 'Serve il collegamento GitHub'); return; }
     const cat = $('#ncat').value.trim() || 'Analisi';
     // stesso giorno, quartiere e categoria ma scansione diversa (es. "Centro" in un'altra città): cartella con suffisso
     const base = `${oggi().replace(/-/g, '').slice(2)}-${slug(q)}-${slug(cat)}`;
     let id = base;
     for (let n = 2; n < 10; n++) { const r = await GH.getJSON(`zone/${id}/richiesta.json`).catch(() => null); if (!r || r.data.report_key === k) break; id = `${base}-${n}`; }
-    const rq = { report_key: k, quartiere: q, citta: $('#nc').value.trim(), categoria: cat.replace(/\s+/g, ''), frase_kw: $('#nf').value.trim(), centrata: $('#nce').value.trim() || `su ${q}`, luogo: $('#nl').value, creata: new Date().toISOString() };
+    const rq = { report_key: k, ...(ka ? { report_key_ai: ka } : {}), quartiere: q, citta: $('#nc').value.trim(), categoria: cat.replace(/\s+/g, ''), frase_kw: $('#nf').value.trim(), centrata: $('#nce').value.trim() || `su ${q}`, luogo: $('#nl').value, creata: new Date().toISOString() };
     const out = $('#nEsito');
     try {
       await GH.putJSON(`zone/${id}/richiesta.json`, rq, await GH.sha(`zone/${id}/richiesta.json`), `Richiesta import ${id}`);
@@ -1252,6 +1258,7 @@ function legaVista(v) {
     V.querySelectorAll('[data-annulla]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.annulla.split('|'); const p = ST.zone[zid].z.prospect[id]; aggiorna(zid, id, { giro: { ...p.giro, fatto: false, fatto_il: '' } }); ST.restaScroll = true; render(); }));
     V.querySelectorAll('[data-togli]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.togli.split('|'); const d = (ST.zone[zid].z.prospect[id].giro || {}).data; aggiorna(zid, id, { giro: {} }); rinumera(zid, d); modificato(zid); ST.restaScroll = true; render(); }));
     V.querySelectorAll('[data-stampa]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.stampa)));
+    V.querySelectorAll('[data-fogli]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.fogli, 'fogli')));
   }
   if (v === 'zone') {
     $('#nuovaScan').onclick = formScansione;

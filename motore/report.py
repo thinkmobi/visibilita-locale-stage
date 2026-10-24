@@ -433,6 +433,17 @@ def genera(percorso_job):
     cartella = os.path.dirname(os.path.abspath(percorso_job))
     job = json.load(open(percorso_job, encoding="utf-8"))
     AVVISI.clear()
+    if job.get("tipo") == "fogli":   # fogli da lasciare porta a porta: A4 orizzontale, Maps contro AI Mode
+        import foglio
+        firma = {**FIRMA, **(job.get("firma") or {})}
+        os.makedirs(os.path.join(cartella, "stampa"), exist_ok=True)
+        nome = job["file"] + ".pdf"
+        av = foglio.genera_fogli(job, cartella, os.path.join(cartella, "stampa", nome), firma)
+        esito = {"file": "stampa/" + nome, "richiesta": job.get("richiesta"), "tipo": "fogli",
+                 "analisi": len(job["fogli"]), "fogli": len(job["fogli"]), "avvisi": sorted(set(av))}
+        json.dump(esito, open(os.path.join(cartella, "stampa", "esito.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        print(json.dumps(esito, ensure_ascii=False, indent=1))
+        return
     cfgs = prepara(job, cartella)
     pre = list(AVVISI)                   # avvisi di prepara (sfondo mancante): non vanno persi col primo passaggio
     SLOG.clear(); SFIX = None

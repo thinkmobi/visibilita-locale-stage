@@ -69,3 +69,57 @@ test('report.py senza griglia: esce con errore chiaro e non produce PDF', () => 
     assert.ok(!fs.existsSync(path.join(dir, 'stampa', job.file + '.pdf')));
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
+
+/* fogli da lasciare: griglia AI Mode di prova (inventata) sulla stessa griglia della fixture */
+function puntiAI(z) { return z.punti.map(([la, lo, ids]) => [la, lo, [...ids].reverse().slice(0, 3)]); }
+
+test('report.py genera i fogli da lasciare: A4 orizzontale, una pagina per attività', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vl-fogli-'));
+  const dir = path.join(tmp, 'zone', ID); fs.mkdirSync(dir, { recursive: true });
+  try {
+    const z = zona('2026-10-23'); z.punti_ai = puntiAI(z);
+    fs.writeFileSync(path.join(dir, 'zona.json'), JSON.stringify(z));
+    const job = L.jobFogli(z, [z.prospect.p1, z.prospect.p2], { data: '2026-10-24', richiesta: 'fogli-prova' });
+    fs.writeFileSync(path.join(dir, 'stampa.json'), JSON.stringify(job));
+    const r = esegui(PY, ['-I', path.join(RADICE, 'motore', 'report.py'), path.join(dir, 'stampa.json')], { cwd: tmp });
+    assert.equal(r.status, 0, `report.py exit ${r.status}\n${r.stderr}\n${r.stdout}`);
+    const buf = fs.readFileSync(path.join(dir, 'stampa', job.file + '.pdf'));
+    assert.equal(buf.subarray(0, 5).toString(), '%PDF-');
+    const pagine = (buf.toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) || []).length;
+    assert.equal(pagine, 2);
+    assert.match(buf.toString('latin1'), /MediaBox \[\s*0 0 841\.8898 595\.2756\s*\]/, 'la pagina non è A4 orizzontale');
+    const esito = JSON.parse(fs.readFileSync(path.join(dir, 'stampa', 'esito.json'), 'utf8'));
+    assert.equal(esito.tipo, 'fogli'); assert.equal(esito.richiesta, 'fogli-prova');
+    assert.deepEqual(esito.avvisi, [], 'avvisi inattesi: ' + esito.avvisi);
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('report.py fogli senza AI Mode: errore chiaro e nessun PDF', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vl-fogli-'));
+  const dir = path.join(tmp, 'zone', ID); fs.mkdirSync(dir, { recursive: true });
+  try {
+    const z = zona('2026-10-23');
+    const job = L.jobFogli(z, [z.prospect.p1], { data: '2026-10-24', richiesta: 'fogli-no-ai' });
+    fs.writeFileSync(path.join(dir, 'stampa.json'), JSON.stringify(job));
+    const r = esegui(PY, ['-I', path.join(RADICE, 'motore', 'report.py'), path.join(dir, 'stampa.json')], { cwd: tmp });
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /AI Mode/);
+    assert.ok(!fs.existsSync(path.join(dir, 'stampa', job.file + '.pdf')));
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+});
+
+test('importa.py abbina i nomi AI Mode alle attività Maps senza falsi positivi', () => {
+  const codice = `
+import sys; sys.path.insert(0, ${JSON.stringify(path.join(RADICE, 'motore'))})
+import importa, json
+att = {"a": {"n": "Scuola di Psicoterapia Torino - IPSIG"}, "b": {"n": "Istituto di Psicoterapia Psicoanalitica"},
+       "c": {"n": "Scuola Gestalt di Torino - Counseling"}, "d": {"n": "Scuola Di Psicoterapia Psicoanalitica"}}
+idx = {"esatto": {importa._norm(v["n"]): k for k, v in att.items()}}
+casi = {"Scuola di Psicoterapia Torino - IPSIG": "a", "Scuola Gestalt di Torino": "c", "Istituto Emmeci": None,
+        "Scuola di Psicoterapia Mara Selvini Palazzoli": None, "Scuola di Psicoterapia Psicoanalitica": "d"}
+print(json.dumps({n: importa.abbina(n, idx) == atteso for n, atteso in casi.items()}))`;
+  const r = esegui(PY, ['-c', codice]);
+  assert.equal(r.status, 0, r.stderr);
+  const esiti = JSON.parse(r.stdout);
+  for (const [n, ok] of Object.entries(esiti)) assert.ok(ok, 'abbinamento sbagliato: ' + n);
+});

@@ -1,6 +1,6 @@
 """Importa una scansione Local Falcon in zone/<id>/zona.json senza passare da Claude.
 Uso (GitHub Actions): LOCALFALCON_API_KEY=... python motore/importa.py zone/<id>/richiesta.json
-richiesta.json: {"report_key": "e01e001722b17ba", "quartiere": "Crocetta", "citta": "Torino",
+richiesta.json: {"report_key": "e01e001722b17ba", "report_key_ai": "facoltativa, scansione AI Mode con la stessa griglia", "quartiere": "Crocetta", "citta": "Torino",
                  "categoria": "AgenzieImmobiliari", "frase_kw": "un'agenzia immobiliare", "centrata": "sulla Crocetta"}
 Se zona.json esiste già, prospect e registro restano intatti: si aggiornano solo punti, attività e metadati."""
 import json, os, sys, time, re, urllib.request, urllib.parse, urllib.error
@@ -128,6 +128,68 @@ def zona_da_report(d, rq, esistente=None, avvisi=None):
     return z
 
 
+def _norm(nome):
+    """nome confrontabile: minuscole, senza accenti, punteggiatura e parole di servizio"""
+    import unicodedata
+    n = unicodedata.normalize("NFKD", nome or "").encode("ascii", "ignore").decode().lower()
+    n = re.sub(r"[^a-z0-9]+", " ", n)
+    return " ".join(w for w in n.split() if w not in {"di", "del", "della", "e", "il", "la", "lo", "srl", "sas", "snc", "spa", "torino"})
+
+
+def abbina(nome, indice):
+    """place_id dell'attività Maps con lo stesso nome della risposta AI Mode, o None.
+    AI Mode usa identificativi suoi: l'unico aggancio è il nome. Prima uguaglianza, poi contenimento
+    (parole intere, almeno 8 caratteri e metà del nome), poi parole in comune (almeno il 60%); un abbinamento ambiguo non vale."""
+    k = _norm(nome)
+    if not k: return None
+    if k in indice["esatto"]: return indice["esatto"][k]
+    def contiene(a, b):   # b dentro a come parole intere, e b copre almeno metà di a: "scuola psicoterapia" non abbina ogni scuola
+        return len(b) >= 8 and len(b) / len(a) >= .5 and f" {b} " in f" {a} "
+    cand = {pid for kk, pid in indice["esatto"].items() if contiene(k, kk) or contiene(kk, k)}
+    if len(cand) == 1: return cand.pop()
+    if cand: return None
+    pk = set(k.split()); migliori, top = [], 0
+    for kk, pid in indice["esatto"].items():
+        pp = set(kk.split()); j = len(pk & pp) / len(pk | pp)
+        if j > top: migliori, top = [pid], j
+        elif j == top: migliori.append(pid)
+    return migliori[0] if top >= .6 and len(set(migliori)) == 1 else None
+
+
+def punti_ai_da_report(d, z, avvisi=None):
+    """griglia AI Mode della stessa zona: [lat, lng, [place_id Maps o "~nome" se non abbinato]] in ordine di posizione.
+    La scansione AI deve avere la stessa griglia della scansione Maps, altrimenti il confronto punto per punto non regge."""
+    indice = {"esatto": {}}
+    for pid, a in (z.get("attivita") or {}).items():
+        k = _norm(a.get("n"))   # solo il nome completo: i nomi brevi automatici ("Istituto") abbinerebbero a caso
+        if k: indice["esatto"].setdefault(k, pid)
+    pm = z.get("punti") or []
+    pa, non_abbinati = [], set()
+    for p in d.get("data_points") or []:
+        la, lo = num(p.get("lat")), num(p.get("lng"))
+        if la is None or lo is None: continue
+        ris = sorted([q for q in p.get("results") or [] if isinstance(q, dict) and num(q.get("rank"), int) is not None],
+                     key=lambda q: num(q["rank"], int))
+        ids = []
+        for q in ris:
+            pid = abbina(q.get("name", ""), indice)
+            if not pid: non_abbinati.add(q.get("name", "")); pid = "~" + (q.get("name") or "")
+            ids.append(pid)
+        pa.append([la, lo, ids])
+    if len(pa) != len(pm):
+        raise RuntimeError(f"la scansione AI Mode ha {len(pa)} punti, quella Maps {len(pm)}: servono stessa griglia e stesso raggio")
+    # stesso ordine dei punti Maps: si abbina ogni punto AI al punto Maps più vicino
+    ordinati = []
+    for la, lo, _ in pm:
+        j = min(range(len(pa)), key=lambda i: (pa[i][0] - la) ** 2 + (pa[i][1] - lo) ** 2)
+        if abs(pa[j][0] - la) > .002 or abs(pa[j][1] - lo) > .002:
+            raise RuntimeError("la griglia AI Mode non coincide con quella Maps: rifai la scansione AI con lo stesso centro")
+        ordinati.append(pa[j])
+    if non_abbinati and avvisi is not None:
+        avvisi.append(f"AI Mode: {len(non_abbinati)} nomi non abbinati alle attività Maps")
+    return ordinati
+
+
 def scarica(url, dest):
     req = urllib.request.Request(url, headers={"User-Agent": "visibilita-locale/1.0"})
     with urllib.request.urlopen(req, timeout=90) as r, open(dest, "wb") as f:
@@ -200,6 +262,22 @@ def main(percorso):
         avvisi = []
         z = zona_da_report(d, rq, esistente, avvisi)
         z["id"] = os.path.basename(cartella)
+        if rq.get("report_key_ai"):
+            # la scansione AI Mode è facoltativa: se non va, la zona si importa comunque e il foglio resta non disponibile
+            try:
+                dai = chiedi_report(rq["report_key_ai"], api_key)
+                if (dai.get("platform") or "").lower() not in ("aimode", "gaio"):
+                    raise RuntimeError(f"la scansione {rq['report_key_ai']} non è di Google AI Mode ({dai.get('platform')})")
+                z["punti_ai"] = punti_ai_da_report(dai, z, avvisi)
+                z["meta"].update(report_key_ai=rq["report_key_ai"], data_ai=(dai.get("date") or "")[:10])
+            except InAttesa:
+                raise
+            except Exception as e:
+                z.pop("punti_ai", None); z["meta"].pop("report_key_ai", None); z["meta"].pop("data_ai", None)
+                avvisi.append(f"AI Mode non importato: {e}")
+        elif z["meta"].get("report_key_ai") and esistente and (esistente.get("meta") or {}).get("report_key") != rq["report_key"]:
+            # nuova scansione Maps senza AI: la griglia AI vecchia non è più confrontabile
+            z.pop("punti_ai", None); z["meta"].pop("report_key_ai", None); z["meta"].pop("data_ai", None)
         fs = os.path.join(cartella, "sfondo.png")
         try:
             if not d.get("image"): raise RuntimeError("Local Falcon non ha fornito l'immagine")

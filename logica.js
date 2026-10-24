@@ -171,5 +171,24 @@
     analisi: prospects.map((p) => L.analisi(z, p)),
   });
 
+  /* fogli da lasciare porta a porta (A4 orizzontale, uno per attività): Maps contro AI Mode sulla stessa griglia */
+  L.haAI = (z) => !!(z && z.punti_ai && z.punti && z.punti_ai.length === z.punti.length);
+  L.jobFogli = (z, prospects, opz = {}) => {
+    const fogli = prospects.map((p) => { const a = z.attivita[p.pid] || {}; const [la, lo] = L.coord(z, p);
+      return { pid: p.pid, nome: p.nome || a.n || '', indirizzo: p.indirizzo || a.a || '', lat: la ?? null, lng: lo ?? null }; });
+    const nomeAtt = fogli.length === 1 ? '-' + (fogli[0].nome || '').replace(/[^\p{L}\p{N}]+/gu, '') : '-Fogli';
+    return {
+      tipo: 'fogli',
+      richiesta: opz.richiesta || String(Date.now()),
+      file: opz.file || L.nomeFile(z, opz.data) + nomeAtt,
+      titolo_pdf: `Visibilità su Google Maps e AI Mode · ${z.meta.quartiere}`,
+      keyword: z.meta.keyword, frase_kw: z.meta.frase_kw, centrata: z.meta.centrata, lato: z.meta.lato, data_testo: z.meta.data_testo,
+      sfondo: z.meta.sfondo || null,
+      firma: opz.firma || null,
+      punti: z.punti, punti_ai: z.punti_ai || null,
+      fogli,
+    };
+  };
+
   if (typeof module !== 'undefined' && module.exports) module.exports = L; else root.L = L;
 })(typeof window !== 'undefined' ? window : globalThis);

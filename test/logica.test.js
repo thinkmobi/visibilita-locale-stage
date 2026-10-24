@@ -156,3 +156,19 @@ test('jobStampa: struttura attesa da motore/report.py', () => {
 });
 
 test('la fixture usa un id di zona valido', () => { assert.match(ID, /^[a-z0-9-]+$/); });
+
+test('jobFogli: tipo, nome file per una o più attività, griglia AI', () => {
+  const { zona } = require('./fixture/zona.js');
+  const z = zona('2026-10-23');
+  assert.equal(L.haAI(z), false);
+  z.punti_ai = z.punti.map(([la, lo]) => [la, lo, []]);
+  assert.equal(L.haAI(z), true);
+  const uno = L.jobFogli(z, [z.prospect.p1], { data: '2026-10-24' });
+  assert.equal(uno.tipo, 'fogli');
+  assert.match(uno.file, /^261024-.+-.+-[^-]+$/);
+  assert.ok(!uno.file.endsWith('-Fogli'));
+  const due = L.jobFogli(z, [z.prospect.p1, z.prospect.p2], { data: '2026-10-24' });
+  assert.ok(due.file.endsWith('-Fogli'));
+  assert.equal(due.fogli.length, 2);
+  assert.equal(due.punti_ai.length, z.punti.length);
+});
