@@ -289,6 +289,9 @@ def main(percorso):
         json.dump(z, open(fz, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
         esito = {"report_key": esito["report_key"], "creata": esito["creata"], "stato": "ok",
                  "punti": len(z["punti"]), "attivita": len(z["attivita"])}
+        if rq.get("report_key_ai"):   # esegui_import.sh confronta anche questa: aggiungere l'AI a una zona già importata rilancia l'import
+            esito["report_key_ai"] = rq["report_key_ai"]
+            if z.get("punti_ai"): esito["punti_ai"] = len(z["punti_ai"])
         if avvisi: esito["avviso"] = "; ".join(avvisi)
         if "sfondo" not in z["meta"]: esito.update(sfondo="mancante", tentativi_sfondo=1)   # si riprova ai run successivi
     except InAttesa as e:   # non è un errore: l'app mostra l'attesa e il conto dei tentativi non sale
