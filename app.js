@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.17.0';
+const VERSIONE = '0.17.1';
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
 const CHIUSI = ['Vinto', 'Perso', 'Scartato'];
 // nomi vecchi degli stati: si leggono ancora e diventano quelli nuovi al primo salvataggio della zona
@@ -958,7 +958,7 @@ function apriZona(zid) {
   const f = apriFoglio(`${z.meta.quartiere} · ${z.meta.keyword}`, `
   <div class="sub">Rilevazione del ${esc(z.meta.data_testo)} · griglia ${esc(z.meta.lato)} · ${(z.punti || []).length} punti · ${L.haAI(z) ? 'AI Mode importato' : 'AI Mode assente'}</div>
   <div class="sub mt">${s.siti && s.siti.aggiornato ? `Siti controllati il ${oraRoma(s.siti.aggiornato, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${Object.values(s.siti.siti).filter((v) => STATO_SITO[v.stato]).length} non funzionanti su ${Object.keys(s.siti.siti).length}` : 'Siti non ancora controllati'}</div>
-  <div class="row mt"><button class="btn mini" id="zSiti">Ricontrolla siti</button><button class="btn mini" id="zPdf">Ultimo PDF</button><button class="btn mini" id="zTesti">Testi della zona</button><button class="btn mini" id="zEsporta">Esporta CSV</button></div>
+  <div class="row mt"><button class="btn mini" id="zSiti">Ricontrolla siti</button><button class="btn mini" id="zPdf">Ultimo PDF</button><button class="btn mini" id="zTesti">Testi della zona</button><button class="btn mini" id="zEsporta">Esporta CSV</button><button class="btn mini" id="zAI">${L.haAI(z) ? 'Aggiorna AI Mode' : 'Aggiungi AI Mode'}</button></div>
   <div class="eb">Attività trovate</div>
   <div class="filtri">${[['top20', 'Presenza'], ['top3', 'Top 3'], ['rv', 'Recensioni'], ['nome', 'Nome']].map(([k, l]) => `<button class="chip ${ord === k ? 'on' : ''}" data-ord="${k}">${l}</button>`).join('')}
   <button class="chip ${ST.f.soloNuove ? 'on' : ''}" id="soloNuove">Solo non in lista</button></div>
@@ -979,6 +979,7 @@ function apriZona(zid) {
       toast('Controllo avviato: 2-5 minuti, poi tocca il pallino in alto', 4500); } catch (e) { toast(e.message); }
   };
   $('#zEsporta', f).onclick = () => esportaCSV(zid);
+  $('#zAI', f).onclick = () => formAI(zid);
 }
 function nuovoProspect(zid, pid) {
   const z = ST.zone[zid].z, a = z.attivita[pid], m = L.metriche(z, pid);
@@ -1040,12 +1041,34 @@ function formScansione() {
     } catch (e) { out.innerHTML = `<span class="c-neg">${esc(e.message)}</span>`; }
   };
 }
-async function attendiImport(id, k, out) {
+/* aggiunge la scansione Google AI Mode a una zona già importata: stessa cartella, prospect e registro intatti */
+function formAI(zid) {
+  const z = ST.zone[zid].z;
+  const f = apriFoglio(`AI Mode · ${z.meta.quartiere}`, `
+  <p class="sub">Esegui su Local Falcon la scansione Google AI Mode con la stessa griglia (${esc(z.meta.lato)}, ${(z.punti || []).length} punti), lo stesso centro e la stessa keyword «${esc(z.meta.keyword)}», poi incolla qui la report key. L'import gira su GitHub; prospect e registro restano come sono.</p>
+  <label class="f">Report key AI Mode<input id="aiK" placeholder="es. 7a025d58a9c8e8d" autocapitalize="off" value="${esc(z.meta.report_key_ai || '')}"></label>
+  <button class="btn pri mt" style="width:100%" id="aiInvia">Importa AI Mode</button><div id="aiEsito" class="mt sub"></div>`, () => apriZona(zid));
+  $('#aiInvia', f).onclick = async () => {
+    const ka = $('#aiK').value.trim().toLowerCase();
+    if (!/^[a-f0-9]{15}$/.test(ka) || ka === z.meta.report_key) { toast('La report key AI Mode ha 15 caratteri esadecimali ed è diversa da quella Maps'); return; }
+    if (!GH.ok()) { toast('Serve il collegamento GitHub'); return; }
+    const out = $('#aiEsito');
+    try {
+      const r = await GH.getJSON(`zone/${zid}/richiesta.json`);
+      if (!r || !r.data || r.data.report_key !== z.meta.report_key) { out.innerHTML = '<span class="c-neg">Richiesta di import della zona non trovata: reimporta la zona da Zone → Nuova zona.</span>'; return; }
+      const rq = { ...r.data, report_key_ai: ka, creata: new Date().toISOString() };
+      await GH.putJSON(`zone/${zid}/richiesta.json`, rq, await GH.sha(`zone/${zid}/richiesta.json`), `AI Mode ${zid}`);
+      out.textContent = 'Richiesta inviata. Import in corso su GitHub (1-3 minuti): puoi chiudere, la griglia AI compare da sola.';
+      attendiImport(zid, z.meta.report_key, out, rq.creata);
+    } catch (e) { out.innerHTML = `<span class="c-neg">${esc(e.message)}</span>`; }
+  };
+}
+async function attendiImport(id, k, out, creata = null) {
   const t0 = ora();
   while (ora() - t0 < 12 * 60000) {
     await new Promise((r) => setTimeout(r, 15000));
     const e = await GH.getJSON(`zone/${id}/importa-esito.json`).catch(() => null);
-    if (e && e.data.report_key === k) {
+    if (e && e.data.report_key === k && (!creata || e.data.creata === creata)) {
       if (e.data.stato === 'in_attesa') { const m = 'Local Falcon sta ancora elaborando la scansione: rilancia l\'import tra qualche minuto.'; if (out) out.textContent = m; else toast(m, 6000); return; }
       if (e.data.stato === 'ok') {
         await scarica();
