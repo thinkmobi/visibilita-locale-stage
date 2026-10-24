@@ -1,0 +1,226 @@
+"""Importa una scansione Local Falcon in zone/<id>/zona.json senza passare da Claude.
+Uso (GitHub Actions): LOCALFALCON_API_KEY=... python motore/importa.py zone/<id>/richiesta.json
+richiesta.json: {"report_key": "e01e001722b17ba", "quartiere": "Crocetta", "citta": "Torino",
+                 "categoria": "AgenzieImmobiliari", "frase_kw": "un'agenzia immobiliare", "centrata": "sulla Crocetta"}
+Se zona.json esiste già, prospect e registro restano intatti: si aggiornano solo punti, attività e metadati."""
+import json, os, sys, time, re, urllib.request, urllib.parse, urllib.error
+
+API = "https://api.localfalcon.com/v1/reports/{}/"
+MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto",
+        "settembre", "ottobre", "novembre", "dicembre"]
+PROSSIMO_PASSO = {
+    "intro": "Questa pagina mostra solo il risultato. L'analisi completa spiega perché Google mette altre attività davanti alla sua e cosa correggere per recuperare posizioni.",
+    "items": [["Concorrenti", "chi la precede, punto per punto"], ["Recensioni", "quante, quanto recenti, cosa dicono"],
+              ["Assistenti AI", "se la citano nelle loro risposte"], ["Scheda Google", "le modifiche fatte senza avvisarla"]],
+    "outro": "Le propongo un incontro di mezz'ora: guardiamo insieme l'analisi completa e decidiamo da dove partire."}
+MAX_TENTATIVI = 3   # oltre, una richiesta che fallisce sempre non viene più ritentata a ogni workflow
+
+
+class InAttesa(RuntimeError):
+    """Local Falcon non ha ancora finito di elaborare la scansione"""
+
+
+def num(x, tipo=float):
+    try: return tipo(float(x))
+    except (TypeError, ValueError): return None
+
+
+def breve(nome):
+    """nome corto per le classifiche stampate; si corregge a mano nell'app (Zone o scheda prospect)"""
+    n = re.split(r"\s*\|\s*|\s+\*+", nome)[0]
+    n = re.sub(r"(?i)^agenzia\s+immobiliare\s+(-\s+)?", "", n)
+    n = re.sub(r"(?i)\s+-\s+agenzia\b.*$", "", n)
+    n = re.sub(r"(?i)\btorino\s*-\s*", "", n)
+    n = re.sub(r"\s+di\s+[A-Z][\w']+\s+[A-Z][\w']+.*$", "", n)
+    n = re.sub(r"\s+[-–]\s+", " ", n)
+    n = re.sub(r"\s{2,}", " ", n).strip(" -–")
+    if n.isupper() and len(n) > 4: n = n.title()
+    if len(n) > 34: n = n[:34].rsplit(" ", 1)[0]
+    return n or nome[:34]
+
+
+def _post(chiave, api_key, modo):
+    """Local Falcon accetta la chiave come campo del form, parametro in URL o header Bearer"""
+    url = API.format(chiave)
+    corpo = urllib.parse.urlencode({"api_key": api_key} if modo != "bearer" else {}).encode()
+    if modo == "query": url += "?" + urllib.parse.urlencode({"api_key": api_key})
+    req = urllib.request.Request(url, data=corpo, method="POST")
+    if modo == "bearer": req.add_header("Authorization", "Bearer " + api_key)
+    with urllib.request.urlopen(req, timeout=90) as r:
+        return r.status, json.load(r)
+
+
+def chiedi_report(chiave, api_key, attese=20):
+    # la risposta resta in cache per il run: se il salvataggio va in conflitto, l'import si ripete senza richiamare Local Falcon
+    cache = os.path.join(os.environ.get("RUNNER_TEMP", "/tmp"), f"lf-{chiave}.json")
+    if os.path.exists(cache):
+        return json.load(open(cache, encoding="utf-8"))
+    d = _chiedi_report(chiave, api_key, attese)
+    json.dump(d, open(cache, "w", encoding="utf-8"))
+    return d
+
+
+def _chiedi_report(chiave, api_key, attese=20):
+    api_key = api_key.strip()
+    modo, ultimo = None, None
+    for _ in range(attese):
+        for m in ([modo] if modo else ["form", "query", "bearer"]):
+            try:
+                stato, risposta = _post(chiave, api_key, m); modo = m; break
+            except urllib.error.HTTPError as e:
+                ultimo = e
+                if e.code not in (401, 403): raise
+        else:
+            raise RuntimeError(f"Local Falcon rifiuta la chiave API ({ultimo.code}): controlla il secret LOCALFALCON_API_KEY")
+        if stato == 200 and (risposta.get("data") or {}).get("data_points"):
+            return risposta["data"]
+        time.sleep(30)          # 202 = scansione ancora in elaborazione
+    raise InAttesa("Local Falcon sta ancora elaborando la scansione (nessun punto della griglia dopo 10 minuti): riprovo al prossimo import")
+
+
+def zona_da_report(d, rq, esistente=None, avvisi=None):
+    z = esistente or {"v": 1, "prospect": {}, "registro": {}}
+    data = (d.get("date") or "")[:10]
+    try:
+        a, m, g = data.split("-"); data_testo = f"{int(g)} {MESI[int(m) - 1]} {a}"
+    except ValueError:
+        data_testo = data
+    grid = num(d.get("grid_size"), int) or 7
+    raggio = num(d.get("radius")) or 1.0
+    if (d.get("measurement") or "km") == "mi": raggio *= 1.609
+    lato = f"{raggio * 2:g}".replace(".", ",")
+    kw = d.get("keyword") or rq.get("keyword", "")
+    meta = dict(z.get("meta") or {})
+    meta.update({
+        "quartiere": rq.get("quartiere", meta.get("quartiere", "")), "citta": rq.get("citta", meta.get("citta", "")),
+        "categoria": rq.get("categoria", meta.get("categoria", "")), "keyword": kw,
+        "frase_kw": rq.get("frase_kw") or meta.get("frase_kw") or f"«{kw}»",
+        "centrata": rq.get("centrata") or meta.get("centrata") or f"su {rq.get('quartiere', '')}",
+        "data": data, "data_testo": data_testo, "lat": num(d.get("lat")), "lng": num(d.get("lng")),
+        "griglia": grid, "lato": f"{lato} × {lato} km", "report_key": d.get("report_key"),
+        "prossimo_passo": meta.get("prossimo_passo") or rq.get("prossimo_passo") or PROSSIMO_PASSO,
+        "u": int(time.time() * 1000)})
+    att = z.get("attivita") or {}
+    ora = int(time.time() * 1000)   # i dati appena importati vincono sulle copie locali dell'app
+    punti = []
+    scartati = 0
+    for p in d["data_points"]:
+        if num(p.get("lat")) is None or num(p.get("lng")) is None:
+            scartati += 1; continue
+        # un risultato malformato (posizione non numerica, place_id assente) si salta senza fermare l'import
+        validi = [q for q in p.get("results") or [] if isinstance(q, dict) and q.get("place_id") and num(q.get("rank"), int) is not None]
+        scartati += len(p.get("results") or []) - len(validi)
+        ris = sorted(validi, key=lambda q: num(q["rank"], int))
+        for q in ris:
+            pid = q["place_id"]
+            vecchio = att.get(pid, {})
+            att[pid] = {"n": q.get("name", ""), "b": vecchio.get("b") or breve(q.get("name", "")),
+                        "a": q.get("address", ""), "la": num(q.get("lat")), "lo": num(q.get("lng")),
+                        "r": num(q.get("rating")), "rv": num(q.get("reviews"), int) or 0,
+                        "t": q.get("phone") or "", "w": q.get("display_url") or q.get("url") or "",
+                        # "claimed" di Local Falcon non è affidabile (13 schede su 13 smentite il 18/10/2026):
+                        # si tiene solo un dato verificato a parte (cv), altrimenti resta sconosciuto
+                        "c": vecchio.get("c") if vecchio.get("cv") else None, "cv": vecchio.get("cv"), "u": ora, "cat": list((q.get("categories") or {}).values())}
+        punti.append([num(p["lat"]), num(p["lng"]), [q["place_id"] for q in ris]])
+    if not punti: raise RuntimeError("la scansione non contiene punti della griglia utilizzabili")
+    if scartati and avvisi is not None: avvisi.append(f"{scartati} risultati o punti malformati ignorati")
+    z.update({"meta": meta, "attivita": att, "punti": punti})
+    return z
+
+
+def scarica(url, dest):
+    req = urllib.request.Request(url, headers={"User-Agent": "visibilita-locale/1.0"})
+    with urllib.request.urlopen(req, timeout=90) as r, open(dest, "wb") as f:
+        f.write(r.read())
+
+
+MAX_SFONDO = 3
+
+
+def ritenta_sfondo(percorso):
+    """zona già importata ma senza sfondo (es. 404 temporaneo di Local Falcon): riprova a scaricare solo l'immagine.
+    Non tocca prospect, registro né punti: aggiunge meta.sfondo a zona.json e aggiorna l'esito."""
+    cartella = os.path.dirname(os.path.abspath(percorso))
+    fe, fz, fs = (os.path.join(cartella, n) for n in ("importa-esito.json", "zona.json", "sfondo.png"))
+    esito = json.load(open(fe, encoding="utf-8"))
+    if esito.get("stato") != "ok" or esito.get("sfondo") != "mancante": return
+    n = esito.get("tentativi_sfondo", 1)
+    if n >= MAX_SFONDO:
+        print(f"sfondo: sospeso dopo {n} tentativi"); return
+    try:
+        api_key = os.environ.get("LOCALFALCON_API_KEY")
+        if not api_key: raise RuntimeError("manca il secret LOCALFALCON_API_KEY nel repository dati")
+        d = chiedi_report(esito["report_key"], api_key)
+        if not d.get("image"): raise RuntimeError("Local Falcon non ha fornito l'immagine")
+        scarica(d["image"], fs)
+        z = json.load(open(fz, encoding="utf-8"))
+        z["meta"]["sfondo"] = "sfondo.png"
+        json.dump(z, open(fz, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        for k in ("sfondo", "tentativi_sfondo", "errore_sfondo"): esito.pop(k, None)
+        esito["avviso"] = "; ".join(a for a in (esito.get("avviso") or "").split("; ") if a and not a.startswith("sfondo non scaricato")) or None
+        if not esito["avviso"]: esito.pop("avviso")
+        print("sfondo scaricato al nuovo tentativo")
+    except InAttesa as e:
+        print(f"sfondo: report non ancora pronto ({e})")
+    except Exception as e:
+        if os.path.exists(fs) and "sfondo" not in json.load(open(fz, encoding="utf-8"))["meta"]: os.remove(fs)
+        esito["tentativi_sfondo"] = n + 1; esito["errore_sfondo"] = str(e)
+        print(f"sfondo: tentativo {n + 1} non riuscito ({e})")
+    json.dump(esito, open(fe, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+
+
+def main(percorso):
+    cartella = os.path.dirname(os.path.abspath(percorso))
+    fe = os.path.join(cartella, "importa-esito.json")
+    try:
+        prima = json.load(open(fe, encoding="utf-8"))
+    except Exception:
+        prima = {}
+    rq = {}
+    esito = {"report_key": None, "stato": "errore"}
+    try:
+        rq = json.load(open(percorso, encoding="utf-8"))
+        esito.update(report_key=rq.get("report_key"), creata=rq.get("creata"))
+        # stessa richiesta già fallita più volte: non si ritenta a ogni workflow; una nuova richiesta dall'app azzera il conto
+        stessa = prima.get("report_key") == esito["report_key"] and prima.get("creata") == esito["creata"]
+        n = prima.get("tentativi", 0) if stessa and prima.get("stato") == "errore" else 0
+        if n >= MAX_TENTATIVI:
+            ultimo = prima.get("errore") or prima.get("messaggio") or "errore sconosciuto"
+            esito.update(tentativi=n, errore=ultimo,
+                         messaggio=f"import sospeso dopo {n} tentativi non riusciti ({ultimo}): invia di nuovo la richiesta dall'app per riprovare")
+            json.dump(esito, open(fe, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+            print(esito["messaggio"])
+            return
+        esito["tentativi"] = n + 1
+        api_key = os.environ.get("LOCALFALCON_API_KEY")
+        if not api_key: raise RuntimeError("manca il secret LOCALFALCON_API_KEY nel repository dati")
+        d = chiedi_report(rq["report_key"], api_key)
+        fz = os.path.join(cartella, "zona.json")
+        esistente = json.load(open(fz, encoding="utf-8")) if os.path.exists(fz) else None
+        avvisi = []
+        z = zona_da_report(d, rq, esistente, avvisi)
+        z["id"] = os.path.basename(cartella)
+        fs = os.path.join(cartella, "sfondo.png")
+        try:
+            if not d.get("image"): raise RuntimeError("Local Falcon non ha fornito l'immagine")
+            scarica(d["image"], fs); z["meta"]["sfondo"] = "sfondo.png"
+        except Exception as e:  # la stampa funziona anche senza sfondo, ma non con la mappa della scansione precedente
+            z["meta"].pop("sfondo", None)
+            if os.path.exists(fs): os.remove(fs)
+            avvisi.insert(0, f"sfondo non scaricato: {e}")
+        json.dump(z, open(fz, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        esito = {"report_key": esito["report_key"], "creata": esito["creata"], "stato": "ok",
+                 "punti": len(z["punti"]), "attivita": len(z["attivita"])}
+        if avvisi: esito["avviso"] = "; ".join(avvisi)
+        if "sfondo" not in z["meta"]: esito.update(sfondo="mancante", tentativi_sfondo=1)   # si riprova ai run successivi
+    except InAttesa as e:   # non è un errore: l'app mostra l'attesa e il conto dei tentativi non sale
+        esito.update(stato="in_attesa", messaggio=str(e), tentativi=esito.get("tentativi", 1) - 1)
+    except Exception as e:
+        esito.update(messaggio=str(e), errore=str(e))
+    if esito.get("creata") is None: esito.pop("creata", None)
+    json.dump(esito, open(fe, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print(json.dumps(esito, ensure_ascii=False, indent=1))
+
+if __name__ == "__main__":
+    if sys.argv[1] == "--sfondo": ritenta_sfondo(sys.argv[2])
+    else: main(sys.argv[1])

@@ -1,0 +1,27 @@
+# Genera il PDF da stampare quando l'app salva zone/<id>/stampa.json
+name: Genera PDF
+on:
+  push:
+    paths: ["zone/*/stampa.json"]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dati-report
+  cancel-in-progress: false
+jobs:
+  pdf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: motore/requirements.txt
+      - run: pip install -r motore/requirements.txt
+      - name: Genera i PDF richiesti
+        run: bash motore/esegui_report.sh
+      - name: Salva nel repository
+        run: bash motore/salva.sh "PDF di stampa" "bash motore/esegui_report.sh"

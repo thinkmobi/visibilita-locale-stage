@@ -1,0 +1,27 @@
+# Importa le scansioni Local Falcon richieste dall'app (zone/<id>/richiesta.json)
+name: Importa scansione
+on:
+  push:
+    paths: ["zone/*/richiesta.json"]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */3 * * *"   # ogni 3 ore: ritenta gli sfondi mancanti (se non c'è nulla da fare finisce in pochi secondi)
+permissions:
+  contents: write
+concurrency:
+  group: dati-importa
+  cancel-in-progress: false
+jobs:
+  importa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Importa le richieste nuove
+        env:
+          LOCALFALCON_API_KEY: ${{ secrets.LOCALFALCON_API_KEY }}
+        run: bash motore/esegui_import.sh
+      - name: Salva nel repository
+        env:
+          LOCALFALCON_API_KEY: ${{ secrets.LOCALFALCON_API_KEY }}
+        run: bash motore/salva.sh "Importa scansione Local Falcon" "bash motore/esegui_import.sh"

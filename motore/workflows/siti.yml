@@ -1,0 +1,37 @@
+# Controlla i siti delle attività quando l'app lo chiede (zone/<id>/siti-richiesta.json),
+# ogni lunedì mattina e a mano dalla scheda Actions.
+name: Controllo siti
+on:
+  push:
+    paths: ["zone/*/siti-richiesta.json"]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dati-siti
+  cancel-in-progress: false
+jobs:
+  siti:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Zone da controllare
+        id: zone
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            prima="${{ github.event.before }}"
+            git cat-file -e "$prima" 2>/dev/null || prima=$(git rev-list --max-parents=0 HEAD | tail -1)
+            { git diff --name-only "$prima" HEAD || true; } | grep -E '^zone/[^/]+/siti-richiesta\.json$' | xargs -r -n1 dirname | sort -u > zone.txt
+          else
+            ls -d zone/*/ | sed 's#/$##' > zone.txt
+          fi
+          cat zone.txt
+      - name: Controllo
+        run: bash motore/esegui_siti.sh
+      - name: Salva nel repository
+        run: bash motore/salva.sh "Controllo siti" "bash motore/esegui_siti.sh"
