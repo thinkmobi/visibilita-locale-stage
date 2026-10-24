@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.17.1';
+const VERSIONE = '0.18.0';
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
 const CHIUSI = ['Vinto', 'Perso', 'Scartato'];
 // nomi vecchi degli stati: si leggono ancora e diventano quelli nuovi al primo salvataggio della zona
@@ -813,12 +813,16 @@ function vGiro() {
       const arr = tutteZ;
       const stampa = arr.filter((x) => x.p.pid && x.z.attivita[x.p.pid] && !(x.p.report && x.p.report.includi === false));
       const fuori = arr.filter((x) => !(x.p.pid && x.z.attivita[x.p.pid]));
-      return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${stampa.length} analisi · ${Math.ceil(stampa.length / 2)} fogli A4</span></div>
-      ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}. Porta per loro la mappa della zona o un'analisi a parte.</div>` : ''}`;
-    })()}
-    <div class="sub">Il PDF esce nell'ordine del giro: taglia la risma a metà e metti la pila inferiore sotto quella superiore.</div>
-    <div class="row mt"><button class="btn pri" data-stampa="${zid}" ${ST.pdf[zid] ? 'disabled' : ''}>Genera PDF</button><button class="btn" data-fogli="${zid}" ${ST.pdf[zid] || !L.haAI(ST.zone[zid].z) ? 'disabled' : ''}>Fogli da lasciare</button><span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div>
-    <div class="sub">${L.haAI(ST.zone[zid].z) ? 'Fogli da lasciare: uno per tappa, A4 orizzontale, Google Maps contro AI Mode.' : 'Fogli da lasciare non disponibili: manca la scansione AI Mode della zona (Zone → Nuova zona, stessa report key Maps più quella AI Mode).'}</div></div>`; }).join('') || '<div class="vuoto">Nessuna tappa in questa data. Aggiungila con “+ Tappa”.</div>'}`;
+      const ai = L.haAI(ST.zone[zid].z), dis = ST.pdf[zid] ? 'disabled' : '';
+      // con la scansione AI Mode i fogli da lasciare sono la stampa principale; il report classico resta come seconda scelta
+      const btnFogli = `<button class="btn ${ai ? 'pri' : ''}" data-fogli="${zid}" ${dis || !ai ? 'disabled' : ''}>Fogli da lasciare</button>`;
+      const btnGiro = `<button class="btn ${ai ? '' : 'pri'}" data-stampa="${zid}" ${dis}>${ai ? 'Report classico' : 'Genera PDF'}</button>`;
+      return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${ai ? `${stampa.length} fogli A4 orizzontali` : `${stampa.length} analisi · ${Math.ceil(stampa.length / 2)} fogli A4`}</span></div>
+      ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}. Porta per loro la mappa della zona o un'analisi a parte.</div>` : ''}
+      <div class="sub">${ai ? 'Fogli da lasciare: uno per tappa, Google Maps contro AI Mode, nell\'ordine del giro.' : 'Il PDF esce nell\'ordine del giro: taglia la risma a metà e metti la pila inferiore sotto quella superiore.'}</div>
+      <div class="row mt">${ai ? btnFogli + btnGiro : btnGiro + btnFogli}<span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div>
+      ${ai ? '<div class="sub">Report classico: due analisi per foglio A4, solo Google Maps.</div>' : '<div class="sub">Fogli da lasciare non disponibili: manca la scansione AI Mode della zona (Zone → dettaglio zona → Aggiungi AI Mode).</div>'}</div>`;
+    })()}`; }).join('') || '<div class="vuoto">Nessuna tappa in questa data. Aggiungila con “+ Tappa”.</div>'}`;
 }
 /* sposta in blocco le tappe di un giro a un'altra data: tutte o solo quelle scelte */
 function formSpostaGiro() {
