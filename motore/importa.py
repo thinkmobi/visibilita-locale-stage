@@ -3,7 +3,7 @@ Uso (GitHub Actions): LOCALFALCON_API_KEY=... python motore/importa.py zone/<id>
 richiesta.json: {"report_key": "e01e001722b17ba", "report_key_ai": "facoltativa, scansione AI Mode con la stessa griglia", "quartiere": "Crocetta", "citta": "Torino",
                  "categoria": "AgenzieImmobiliari", "frase_kw": "un'agenzia immobiliare", "centrata": "sulla Crocetta"}
 Se zona.json esiste già, prospect e registro restano intatti: si aggiornano solo punti, attività e metadati."""
-import json, os, sys, time, re, urllib.request, urllib.parse, urllib.error
+import json, math, os, sys, time, re, urllib.request, urllib.parse, urllib.error
 
 API = "https://api.localfalcon.com/v1/reports/{}/"
 MESI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto",
@@ -136,13 +136,30 @@ def _norm(nome):
     return " ".join(w for w in n.split() if w not in {"di", "del", "della", "e", "il", "la", "lo", "srl", "sas", "snc", "spa", "torino"})
 
 
-def abbina(nome, indice):
+def _frase(nome):
+    """come _norm ma senza togliere parole: per cercare il marchio come frase intera"""
+    import unicodedata
+    n = unicodedata.normalize("NFKD", nome or "").encode("ascii", "ignore").decode().lower()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", n).split())
+
+
+def abbina(nome, indice, punto=None):
     """place_id dell'attività Maps con lo stesso nome della risposta AI Mode, o None.
     AI Mode usa identificativi suoi: l'unico aggancio è il nome. Prima uguaglianza, poi contenimento
     (parole intere, almeno 8 caratteri e metà del nome), poi parole in comune (almeno il 60%); un abbinamento ambiguo non vale."""
     k = _norm(nome)
     if not k: return None
     if k in indice["esatto"]: return indice["esatto"][k]
+    # AI Mode cita spesso il marchio ("Torino Case", "Toscano"): vale se la frase intera compare in un solo nome Maps
+    f = _frase(nome)
+    if len(f) >= 5 and indice.get("frasi"):
+        cand = {pid for ff, pid in indice["frasi"] if f" {f} " in f" {ff} "}
+        if len(cand) == 1: return cand.pop()
+        if len(cand) > 1:
+            # marchio con più sedi (Tecnocasa, Abytare): AI Mode non dice quale, si attribuisce alla sede più vicina al punto
+            pos = indice.get("pos") or {}
+            vicine = [(math.hypot(pos[c][0] - punto[0], (pos[c][1] - punto[1]) * .707), c) for c in cand if punto and pos.get(c)]
+            return min(vicine)[1] if vicine else None
     def contiene(a, b):   # b dentro a come parole intere, e b copre almeno metà di a: "scuola psicoterapia" non abbina ogni scuola
         return len(b) >= 8 and len(b) / len(a) >= .5 and f" {b} " in f" {a} "
     cand = {pid for kk, pid in indice["esatto"].items() if contiene(k, kk) or contiene(kk, k)}
@@ -159,10 +176,12 @@ def abbina(nome, indice):
 def punti_ai_da_report(d, z, avvisi=None):
     """griglia AI Mode della stessa zona: [lat, lng, [place_id Maps o "~nome" se non abbinato]] in ordine di posizione.
     La scansione AI deve avere la stessa griglia della scansione Maps, altrimenti il confronto punto per punto non regge."""
-    indice = {"esatto": {}}
+    indice = {"esatto": {}, "frasi": [], "pos": {}}
     for pid, a in (z.get("attivita") or {}).items():
+        if a.get("la") is not None and a.get("lo") is not None: indice["pos"][pid] = (a["la"], a["lo"])
         k = _norm(a.get("n"))   # solo il nome completo: i nomi brevi automatici ("Istituto") abbinerebbero a caso
         if k: indice["esatto"].setdefault(k, pid)
+        indice["frasi"].append((_frase(a.get("n")), pid))
     pm = z.get("punti") or []
     pa, non_abbinati = [], set()
     for p in d.get("data_points") or []:
@@ -172,7 +191,7 @@ def punti_ai_da_report(d, z, avvisi=None):
                      key=lambda q: num(q["rank"], int))
         ids = []
         for q in ris:
-            pid = abbina(q.get("name", ""), indice)
+            pid = abbina(q.get("name", ""), indice, (la, lo))
             if not pid: non_abbinati.add(q.get("name", "")); pid = "~" + (q.get("name") or "")
             ids.append(pid)
         pa.append([la, lo, ids])
