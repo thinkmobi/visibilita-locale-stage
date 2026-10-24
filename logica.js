@@ -34,8 +34,8 @@
   };
 
   /* metriche di un'attività su tutta la griglia */
-  L.metriche = (z, pid) => {
-    const punti = z.punti || [];   // zona senza griglia: metriche a zero invece di un errore
+  L.metriche = (z, pid, campo = 'punti') => {
+    const punti = z[campo] || [];   // zona senza griglia: metriche a zero invece di un errore
     const N = punti.length;
     const ranks = punti.map(([, , r]) => { const i = r.indexOf(pid); return i < 0 ? null : i + 1; });
     const trovati = ranks.filter((r) => r);
@@ -173,6 +173,13 @@
 
   /* fogli da lasciare porta a porta (A4 orizzontale, uno per attività): Maps contro AI Mode sulla stessa griglia */
   L.haAI = (z) => !!(z && z.punti_ai && z.punti && z.punti_ai.length === z.punti.length);
+  /* AI Mode della stessa attività: metriche sulla griglia AI e zone in cui Maps la mette tra i primi 3 e AI Mode no */
+  L.metricheAI = (z, pid) => {
+    if (!L.haAI(z)) return null;
+    const m = L.metriche(z, pid, 'punti_ai'), mm = L.metriche(z, pid);
+    const perse = mm.ranks.map((r, i) => !!(r && r <= 3 && !(m.ranks[i] && m.ranks[i] <= 3)));
+    return { ...m, perse, nPerse: perse.filter(Boolean).length };
+  };
   L.jobFogli = (z, prospects, opz = {}) => {
     const fogli = prospects.map((p) => { const a = z.attivita[p.pid] || {}; const [la, lo] = L.coord(z, p);
       return { pid: p.pid, nome: p.nome || a.n || '', indirizzo: p.indirizzo || a.a || '', lat: la ?? null, lng: lo ?? null }; });

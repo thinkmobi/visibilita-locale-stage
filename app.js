@@ -490,13 +490,27 @@ function chiudiFoglio() {
   // aggiornamenti arrivati mentre il foglio era aperto: si mostrano adesso
   if (ST.daRender) { ST.daRender = false; ST.restaScroll = true; setTimeout(render, 0); }
 }
-function minigriglia(z, pid) {
-  const m = L.metriche(z, pid); const n = z.meta.griglia || Math.round(Math.sqrt(m.N));
+function minigriglia(z, pid, opz = {}) {
+  const m = opz.ai ? L.metricheAI(z, pid) : L.metriche(z, pid); const n = z.meta.griglia || Math.round(Math.sqrt(m.N));
   // punti ordinati da nord-ovest a sud-est per la visualizzazione
   const idx = z.punti.map((pt, i) => i).sort((a, b) => (z.punti[b][0] - z.punti[a][0]) || (z.punti[a][1] - z.punti[b][1]));
   const rows = []; for (let i = 0; i < idx.length; i += n) rows.push(idx.slice(i, i + n).sort((a, b) => z.punti[a][1] - z.punti[b][1]));
   const cl = (r) => (!r ? 'g-no' : r === 1 ? 'g-1' : r === 2 ? 'g-2' : r === 3 ? 'g-3' : r <= 6 ? 'g-y' : r <= 10 ? 'g-o' : 'g-r');
-  return `<div class="griglia" style="grid-template-columns:repeat(${n},1fr)">${rows.flat().map((i) => { const r = m.ranks[i]; return `<i class="${cl(r)}">${r || ''}</i>`; }).join('')}</div>` + `<div class="griglia-legenda"><span><i style="background:var(--g1)"></i>1-3 visibile</span><span><i style="background:var(--y)"></i>4-10 poco visibile</span><span><i style="background:var(--r1)"></i>11-20 invisibile</span><span><i style="background:var(--r2)"></i>assente</span></div>`;
+  return `<div class="griglia" style="grid-template-columns:repeat(${n},1fr)">${rows.flat().map((i) => { const r = m.ranks[i]; return `<i class="${cl(r)}${opz.ai && m.perse[i] ? ' perso' : ''}">${r || ''}</i>`; }).join('')}</div>` + (opz.ai ? '' : `<div class="griglia-legenda"><span><i style="background:var(--g1)"></i>1-3 visibile</span><span><i style="background:var(--y)"></i>4-10 poco visibile</span><span><i style="background:var(--r1)"></i>11-20 invisibile</span><span><i style="background:var(--r2)"></i>assente</span></div>`);
+}
+/* scheda cliente: Google AI Mode sulla stessa griglia, con le zone perse rispetto a Maps */
+function sezioneAI(z, p) {
+  if (!p.pid || !z.attivita[p.pid]) return '';
+  if (!L.haAI(z)) return `<div class="eb">Google AI Mode</div><div class="sub">Scansione AI Mode non importata per questa zona: la aggiungi da Zone → Nuova zona, con la stessa report key Maps più quella AI Mode.</div>`;
+  const a = L.metricheAI(z, p.pid), mm = L.metriche(z, p.pid), pc = (n) => Math.round(n / a.N * 100);
+  return `<div class="eb">Google AI Mode · «${esc(z.meta.keyword)}»</div>
+  <div class="stat"><div><b class="c-${L.colorePct(pc(a.top3))}">${a.top3}/${a.N}</b><span>tra le prime 3</span></div>
+  <div><b class="c-${L.colorePct(pc(a.top20))}">${a.top20}/${a.N}</b><span>citata</span></div>
+  <div><b>${a.arp ? Math.ceil(a.arp - 1e-9) + 'ª' : '—'}</b><span>posizione media${a.top20 && a.top20 < a.N ? ' dove citata' : ''}</span></div>
+  <div><b class="${a.nPerse ? 'c-neg' : ''}">${a.nPerse}</b><span>zone perse</span></div></div>
+  <div class="mt">${minigriglia(z, p.pid, { ai: true })}</div>
+  <div class="griglia-legenda"><span><i class="perso-ico"></i>tratteggio: tra le prime 3 su Maps, non su AI Mode</span>${z.meta.data_ai ? `<span>rilevazione AI del ${esc(gg(z.meta.data_ai))}</span>` : ''}</div>
+  ${a.nPerse ? `<div class="avviso">Su Maps è tra le prime 3 in ${mm.top3} zone, su AI Mode in ${a.top3}: ${a.nPerse} zone (${pc(a.nPerse)}%) in cui chi cerca con l'intelligenza artificiale di Google vede prima i concorrenti.</div>` : ''}`;
 }
 function apriProspect(zid, id, opz = {}) {
   const s = ST.zone[zid]; if (!s || !s.z.prospect[id]) { location.hash = '#prospect'; return; }
@@ -538,6 +552,7 @@ function apriProspect(zid, id, opz = {}) {
   <div><b class="c-${L.colorePct(Math.round(m.top20 / m.N * 100))}">${m.top20}/${m.N}</b><span>tra le prime 20</span></div>
   <div><b>${m.atrp ? L.virgola(m.atrp) : '—'}</b><span>posizione media</span></div><div><b>${a.rv ?? '—'}</b><span>recensioni ${L.virgola(a.r)}</span></div></div>
   <div class="mt">${minigriglia(z, p.pid)}</div>
+  ${sezioneAI(z, p)}
   ${an ? `<div class="box classifica"><b>${esc(an.list_title)}</b><table class="cl">${an.list.map(([r, n, rv, me]) => `<tr class="${me ? 'me' : ''}"><td>${r || '20+'}</td><td>${esc(n)}</td><td style="text-align:right" class="mono">${esc(rv)}</td></tr>`).join('')}</table></div>` : ''}` : '<div class="avviso mt">Attività non presente nella scansione della zona: niente metriche né report.</div>'}
   <div class="eb" id="registroP">Registro (${reg.length})</div>
   ${reg.map((r) => `<div class="reg"><div class="riga"><b>${esc(r.esito || r.canale)}</b><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}</span></div>

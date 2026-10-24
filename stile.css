@@ -107,6 +107,8 @@ table.cl tr.me td{background:#EAF1FD;font-weight:600;font-display:swap}
 .mt{margin-top:12px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .btn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .btn.mini{white-space:nowrap}
+.griglia i.perso{outline:1.5px dashed var(--ink);outline-offset:1.5px}
+.griglia-legenda .perso-ico{background:var(--r2);outline:1.5px dashed var(--ink);outline-offset:1px}
 .griglia-legenda{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px;font-size:12px;color:var(--mute)}.griglia-legenda i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
 .card.con-mappa{display:flex;gap:11px;align-items:center}.card-testo{flex:1;min-width:0}
 .mini{flex:none;display:block;border-radius:7px;background:#F4F5F3;padding:0}.mini.vuota{background:repeating-linear-gradient(45deg,#F4F5F3 0 4px,#E6E9E5 4px 8px);border-radius:7px}
