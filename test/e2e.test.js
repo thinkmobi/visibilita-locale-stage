@@ -197,8 +197,9 @@ test('8. «Genera PDF»: scrive stampa.json con le tappe del giro e mostra «Apr
     await t.page.waitForFunction((p) => !!document.querySelector('#st-' + p) && /generazione/i.test(document.querySelector('#st-' + p).textContent), ID, { timeout: 8000 });
     const job = t.gh.json(`zone/${ID}/stampa.json`);
     assert.ok(job, 'stampa.json non scritto');
-    assert.equal(job.analisi.length, 2);
-    assert.deepEqual(job.analisi.map((a) => a.pid), ['pA', 'pB']);
+    assert.equal(job.tipo, 'fogli');
+    assert.equal(job.fogli.length, 2);
+    assert.deepEqual(job.fogli.map((a) => a.pid), ['pA', 'pB']);
     assert.equal(job.punti.length, 9);
     // il motore (Actions) risponde: la prossima lettura trova l’esito
     t.gh.metti(`zone/${ID}/stampa/esito.json`, { file: 'stampa/prova.pdf', richiesta: job.richiesta, analisi: 2, fogli: 1, avvisi: [] });

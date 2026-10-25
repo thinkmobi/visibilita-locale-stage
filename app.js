@@ -751,7 +751,10 @@ async function disegnaMappaGiro() {
 }
 function vGiro() {
   const tt = tutti().filter((x) => x.p.giro && x.p.giro.data);
-  const date = [...new Set(tt.map((x) => x.p.giro.data))].sort();
+  // nel menu delle date restano i giri da fare: una data passata con tutte le tappe consegnate
+  // (es. dopo «Sposta giro», dove le consegnate restano alla data vecchia) sparisce; si riapre dal campo data
+  const date = [...new Set(tt.filter((x) => x.p.giro.data >= oggi() || !x.p.giro.fatto).map((x) => x.p.giro.data))].sort();
+  if (ST.giroData && !date.includes(ST.giroData) && tt.some((x) => x.p.giro.data === ST.giroData)) date.push(ST.giroData), date.sort();
   if (!ST.giroData) ST.giroData = date.find((d) => d >= oggi()) || date[date.length - 1] || oggi();
   const d = ST.giroData;
   const tutte = tt.filter((x) => x.p.giro.data === d).sort((a, b) => a.zid.localeCompare(b.zid) || (a.p.giro.ordine || 99) - (b.p.giro.ordine || 99));
@@ -812,7 +815,7 @@ function vGiro() {
       const fuori = arr.filter((x) => !(x.p.pid && x.z.attivita[x.p.pid]));
       const ai = L.haAI(ST.zone[zid].z);
       // un solo pulsante: con la scansione AI Mode escono i fogli (uno per tappa), senza esce il report del giro
-      return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${ai ? `${stampa.length} fogli A4` : `${Math.ceil(stampa.length / 2)} fogli A4`}</span></div>
+      return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${stampa.length} fogli A4${ai ? '' : ' · solo Google Maps'}</span></div>
       ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}.</div>` : ''}
       <div class="row mt"><button class="btn pri" data-stampa="${zid}" ${ST.pdf[zid] ? 'disabled' : ''}>Genera PDF</button><span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div></div>`;
     })()}`; }).join('') || '<div class="vuoto">Nessuna tappa in questa data. Aggiungila con “+ Tappa”.</div>'}`;
@@ -890,7 +893,6 @@ async function generaPdf(zid, tipo = 'giro') {
     .sort((a, b) => (a.p.giro.ordine || 99) - (b.p.giro.ordine || 99)).map((x) => x.p);
   if (!ps.length) { toast('Nessuna analisi da stampare'); return; }
   const firma = ST.conf.firma && ST.conf.firma.nome ? ST.conf.firma : null;
-  if (tipo === 'fogli' && !L.haAI(z)) { toast('Manca la scansione AI Mode della zona'); return; }
   const job = tipo === 'fogli' ? L.jobFogli(z, ps, { data: oggi(), firma }) : L.jobStampa(z, ps, { data: z.meta.data, firma });
   blocca(true);
   try {
@@ -1292,7 +1294,7 @@ function legaVista(v) {
     V.querySelectorAll('[data-fatto]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.fatto.split('|'); formContatto(zid, id, { canale: 'Passaggio', esito: 'Report consegnato', giro: true, ritorno: '#giro' }); }));
     V.querySelectorAll('[data-annulla]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.annulla.split('|'); const p = ST.zone[zid].z.prospect[id]; aggiorna(zid, id, { giro: { ...p.giro, fatto: false, fatto_il: '' } }); ST.restaScroll = true; render(); }));
     V.querySelectorAll('[data-togli]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.togli.split('|'); const d = (ST.zone[zid].z.prospect[id].giro || {}).data; aggiorna(zid, id, { giro: {} }); rinumera(zid, d); modificato(zid); ST.restaScroll = true; render(); }));
-    V.querySelectorAll('[data-stampa]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.stampa, L.haAI(ST.zone[b.dataset.stampa].z) ? 'fogli' : 'giro')));
+    V.querySelectorAll('[data-stampa]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.stampa, 'fogli')));
   }
   if (v === 'zone') {
     $('#nuovaScan').onclick = formScansione;

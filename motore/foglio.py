@@ -69,16 +69,27 @@ def metriche(rk):
 def testi(job, f, mm_, ma, debole):
     """testi del foglio: generati dai numeri e dalla frase della zona, uguali per ogni settore.
     debole = "ai" o "maps": il titolo parla della piattaforma in cui l'attività è più indietro"""
-    N, a, b = mm_["N"], mm_["top3"], ma["top3"]
+    N, a = mm_["N"], mm_["top3"]
+    b = ma["top3"] if ma else None
     chi = esc(job.get("frase_kw") or f"«{job.get('keyword', '')}»")
+    rosso = lambda t: f"<font color='#C5221F'>{t}</font>"
+    zone = lambda n: f"{n} zona" if n == 1 else f"{n} zone"
+    lettura = "Ogni pallino è una zona: il numero è la vostra posizione su Google da quel punto. Il quadratino nero è la vostra sede."
+    invito = ("Prossimo passo", "Vi mostro l’analisi completa",
+              "In un incontro guardiamo zona per zona chi vi passa davanti e parliamo delle azioni correttive per migliorare il vostro posizionamento nel tempo.")
+    if ma is None:   # zona senza scansione AI Mode: solo Google Maps
+        fuori = N - a
+        titolo = (f"Su Google Maps, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti" if fuori
+                  else f"Su Google Maps siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>")
+        quota = f"{100 - su(a / N * 100)}%" if N else "0%"
+        return {"titolo": titolo, "lettura": lettura, "fuori": fuori, "invito": invito, "dove": "Su Google Maps",
+                "rischio": (quota, "delle zone: chi cerca da lì vede prima i vostri concorrenti e chiama loro.")}
     dentro = b if debole == "ai" else a
     fuori = N - dentro
     altro_fuori = N - (a if debole == "ai" else b)
     dove = "Nelle risposte di Google AI Mode" if debole == "ai" else "Su Google Maps"
     altrove = "Su Google Maps" if debole == "ai" else "Su Google AI Mode"
-    rosso = lambda t: f"<font color='#C5221F'>{t}</font>"
     # il titolo parte dalla piattaforma più debole e cita sempre anche l'altra
-    zone = lambda n: f"{n} zona" if n == 1 else f"{n} zone"
     if fuori and fuori == altro_fuori:
         titolo = f"Su Google Maps e su Google AI Mode, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti"
     elif fuori:
@@ -155,11 +166,11 @@ def mappa(c, x, y, S, punti, rk, bg, sede):
 def pagina(c, job, f, bg, firma):
     W, H = landscape(A4)
     ML, MR, MT, MB = 12.5 * mm, 12.5 * mm, 10 * mm, 7.5 * mm
-    punti, pai = job["punti"], job["punti_ai"]
-    rkm, rka = ranghi(punti, f["pid"]), ranghi(pai, f["pid"])
-    mm_, ma = metriche(rkm), metriche(rka)
+    punti, pai = job["punti"], (job.get("punti_ai") or None)
+    rkm = ranghi(punti, f["pid"]); mm_ = metriche(rkm)
+    rka = ranghi(pai, f["pid"]) if pai else None; ma = metriche(rka) if pai else None
     # piattaforma debole: quella con meno zone tra i primi 3 (a parità, AI Mode)
-    debole = "maps" if mm_["top3"] < ma["top3"] else "ai"
+    debole = "maps" if (not ma or mm_["top3"] < ma["top3"]) else "ai"
     T = testi(job, f, mm_, ma, debole)
     top = H - MT
     # --- testata: a sinistra data, nome e indirizzo; a destra la ricerca
@@ -205,21 +216,33 @@ def pagina(c, job, f, bg, firma):
     S = min(80 * mm, avail - head_h - stat_h)
     xm = ML
     sede = (f.get("lat"), f.get("lng"))
-    for i, (lab, sub, pts, rk, m) in enumerate([
-            ("Google Maps", "la mappa di Google", punti, rkm, mm_),
-            ("Google AI Mode", "le risposte dell’intelligenza artificiale", pai, rka, ma)]):
-        x = xm + i * (S + gap)
-        spaced(c, x, y - 3 * mm, lab, "MOB", 8.6, INK, .1)
-        c.setFillColor(MUTE); c.setFont("P", 8.2); c.drawString(x, y - 7 * mm, sub)
-        c.setStrokeColor(LINE); c.setLineWidth(.5); c.line(x, y - head_h + .6 * mm, x + S, y - head_h + .6 * mm)
-        my = y - head_h - 1.6 * mm - S
-        mappa(c, x, my, S, pts, rk, bg, sede)
-        # numeri sotto la mappa
-        rr = 9.4 * mm; cy = my - 3 * mm - rr
+    def numeri(x, cy, rk, m):
+        rr = 9.4 * mm
         ring(c, x + rr, cy, rr - 1.6 * mm, rk, 3.2 * mm)
         tx = x + 2 * rr + 4 * mm
         c.setFillColor(INK); c.setFont("C", 20); c.drawString(tx, cy + .6 * mm, f"{m['top3']} {'zona' if m['top3'] == 1 else 'zone'} su {m['N']}")
         c.setFillColor(MUTE); c.setFont("P", 9.6); c.drawString(tx, cy - 4.4 * mm, "tra i primi 3 risultati")
+    def testata(x, lab, sub, w):
+        spaced(c, x, y - 3 * mm, lab, "MOB", 8.6, INK, .1)
+        c.setFillColor(MUTE); c.setFont("P", 8.2); c.drawString(x, y - 7 * mm, sub)
+        c.setStrokeColor(LINE); c.setLineWidth(.5); c.line(x, y - head_h + .6 * mm, x + w, y - head_h + .6 * mm)
+    if pai:
+        for i, (lab, sub, pts, rk, m) in enumerate([
+                ("Google Maps", "la mappa di Google", punti, rkm, mm_),
+                ("Google AI Mode", "le risposte dell’intelligenza artificiale", pai, rka, ma)]):
+            x = xm + i * (S + gap)
+            testata(x, lab, sub, S)
+            my = y - head_h - 1.6 * mm - S
+            mappa(c, x, my, S, pts, rk, bg, sede)
+            numeri(x, my - 3 * mm - 9.4 * mm, rk, m)
+    else:
+        # solo Google Maps: una mappa più grande, i numeri alla sua destra; la colonna destra resta dov'è
+        largo = 2 * S + gap
+        S1 = min(avail - head_h - 1.6 * mm, largo - 60 * mm)
+        testata(xm, "Google Maps", "la mappa di Google", largo)
+        my = y - head_h - 1.6 * mm - S1
+        mappa(c, xm, my, S1, punti, rkm, bg, sede)
+        numeri(xm + S1 + 6 * mm, my + S1 / 2, rkm, mm_)
     sx = xm + 2 * S + gap + gcol; sw = W - MR - sx
     # riquadro rosso: cosa state perdendo
     big, rt = T["rischio"]
@@ -276,9 +299,7 @@ AVVISI_F = []
 def genera_fogli(job, cartella, out, firma):
     """un foglio per attività; restituisce gli avvisi"""
     AVVISI_F.clear()
-    if not job.get("punti_ai"):
-        raise ValueError("manca la scansione Google AI Mode della zona: importala dall'app (report AI Mode) e riprova")
-    if len(job["punti_ai"]) != len(job["punti"]):
+    if job.get("punti_ai") and len(job["punti_ai"]) != len(job["punti"]):
         raise ValueError("le griglie Maps e AI Mode non hanno lo stesso numero di punti: rifai l'import della zona")
     bg = os.path.join(cartella, job["sfondo"]) if job.get("sfondo") else None
     if bg and not os.path.exists(bg): AVVISI_F.append("sfondo mappa non trovato: fogli senza mappa"); bg = None
