@@ -73,11 +73,19 @@ def testi(job, f, mm_, ma, debole):
     chi = esc(job.get("frase_kw") or f"«{job.get('keyword', '')}»")
     dentro = b if debole == "ai" else a
     fuori = N - dentro
+    altro_fuori = N - (a if debole == "ai" else b)
     dove = "Nelle risposte di Google AI Mode" if debole == "ai" else "Su Google Maps"
-    if fuori:
-        titolo = f"{dove}, in <font color='#C5221F'>{fuori} zone su {N}</font> chi cerca {chi} trova prima i vostri concorrenti"
+    altrove = "Su Google Maps" if debole == "ai" else "Su Google AI Mode"
+    rosso = lambda t: f"<font color='#C5221F'>{t}</font>"
+    # il titolo parte dalla piattaforma più debole e cita sempre anche l'altra
+    zone = lambda n: f"{n} zona" if n == 1 else f"{n} zone"
+    if fuori and fuori == altro_fuori:
+        titolo = f"Su Google Maps e su Google AI Mode, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti"
+    elif fuori:
+        titolo = f"{dove}, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti. "
+        titolo += f"{altrove} succede in {rosso(altro_fuori)}." if altro_fuori else f"{altrove} siete tra i primi 3 ovunque."
     else:
-        titolo = f"{dove} siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
+        titolo = f"Su Google Maps e su Google AI Mode siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
     sub = f"Tra i primi 3: su Google Maps in {a} zone su {N} ({pc(a, N)}), su Google AI Mode in {b} ({pc(b, N)})."
     lettura = "Ogni pallino è una zona: il numero è la vostra posizione su Google da quel punto. Il quadratino nero è la vostra sede."
     # percentuale complementare a quella dell'anello della piattaforma debole: le due sommano sempre 100
@@ -210,7 +218,7 @@ def pagina(c, job, f, bg, firma):
         rr = 9.4 * mm; cy = my - 3 * mm - rr
         ring(c, x + rr, cy, rr - 1.6 * mm, rk, 3.2 * mm)
         tx = x + 2 * rr + 4 * mm
-        c.setFillColor(INK); c.setFont("C", 20); c.drawString(tx, cy + .6 * mm, f"{m['top3']} zone su {m['N']}")
+        c.setFillColor(INK); c.setFont("C", 20); c.drawString(tx, cy + .6 * mm, f"{m['top3']} {'zona' if m['top3'] == 1 else 'zone'} su {m['N']}")
         c.setFillColor(MUTE); c.setFont("P", 9.6); c.drawString(tx, cy - 4.4 * mm, "tra i primi 3 risultati")
     sx = xm + 2 * S + gap + gcol; sw = W - MR - sx
     # riquadro rosso: cosa state perdendo
