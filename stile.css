@@ -249,3 +249,7 @@ html.avvio,html.avvio body{background:#1F1E1B}
 .splash-v{position:absolute;left:0;right:0;bottom:calc(28px + env(safe-area-inset-bottom,0px));text-align:center;font:400 12px/1.5 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;color:#87867F}
 .splash-logo{width:min(64vw,320px);height:auto;max-width:100%}
 @media (prefers-reduced-motion: reduce){.splash{transition:none}}
+
+/* giri passati con tappe ancora da fare: arancione chiaro della palette */
+.date-giro .chip.arretrato{border-color:#F29529;background:#FEF4E8}
+.date-giro .chip.arretrato.on{border-color:var(--ink);background:var(--ink)}

@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.20.1';
+const VERSIONE = '0.20.2';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 { const sv = document.getElementById('splashV'); if (sv) sv.textContent = 'Versione ' + VERSIONE; }
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
@@ -747,10 +747,19 @@ function vGiro() {
   const tt = tutti().filter((x) => x.p.giro && x.p.giro.data);
   // nel menu delle date restano i giri da fare: una data passata con tutte le tappe consegnate
   // (es. dopo «Sposta giro», dove le consegnate restano alla data vecchia) sparisce; si riapre dal campo data
-  const date = [...new Set(tt.filter((x) => x.p.giro.data >= oggi() || (!x.p.giro.fatto && aperto(x.p))).map((x) => x.p.giro.data))].sort();
-  if (ST.giroData && !date.includes(ST.giroData) && tt.some((x) => x.p.giro.data === ST.giroData)) date.push(ST.giroData), date.sort();
-  if (!ST.giroData) ST.giroData = date.find((d) => d >= oggi()) || date[date.length - 1] || oggi();
+  const og = oggi();
+  // all'apertura, al cambio di giorno e dopo una lunga pausa il giro riparte da oggi
+  if (ST.giroGiorno !== og || !ST.giroData) { ST.giroData = og; ST.giroGiorno = og; }
+  const date = [...new Set(tt.filter((x) => x.p.giro.data >= og || (!x.p.giro.fatto && aperto(x.p))).map((x) => x.p.giro.data))];
+  // oggi c'è sempre; la data scelta dal campo resta visibile finché è selezionata
+  for (const x of [og, ST.giroData]) if (!date.includes(x)) date.push(x);
+  date.sort();
   const d = ST.giroData;
+  // tappe ancora da fare per data, per il numero sulle date
+  const daFare = {}; tt.forEach((x) => { if (!x.p.giro.fatto && aperto(x.p)) daFare[x.p.giro.data] = (daFare[x.p.giro.data] || 0) + 1; });
+  const domani = new Date(og + 'T12:00'); domani.setDate(domani.getDate() + 1); const dm = domani.toISOString().slice(0, 10);
+  const etichettaData = (x) => (x === og ? 'Oggi' : x === dm ? 'Domani' : ggLungo(x)) + (daFare[x] ? ` · ${daFare[x]}` : '');
+  const prossima = date.find((x) => x > og && daFare[x]);
   const tutte = tt.filter((x) => x.p.giro.data === d).sort((a, b) => a.zid.localeCompare(b.zid) || (a.p.giro.ordine || 99) - (b.p.giro.ordine || 99));
   // numero di tappa fisso (posizione nel giro della zona), anche quando i filtri nascondono qualcosa
   const numTappa = {}; const cont = {}; tutte.forEach((x) => (numTappa[x.zid + '|' + x.p.id] = cont[x.zid] = (cont[x.zid] || 0) + 1));
@@ -780,7 +789,7 @@ function vGiro() {
   const senzaCoord = tappe.length - ST.mappaGiro.length;
   const percorso = (arr) => { const dest = arr[arr.length - 1]; const wp = arr.slice(0, -1).slice(0, 9); return `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${encodeURIComponent(dest)}${wp.length ? '&waypoints=' + encodeURIComponent(wp.join('|')) : ''}`; };
   return `<div class="barra-giro"><input type="date" id="gData" class="cerca" value="${d}"><button class="btn" id="gAgg">+ Tappa</button>${tutte.length ? '<button class="btn" id="gSposta">Sposta…</button>' : ''}</div>
-  <div class="filtri mt">${date.map((x) => `<button class="chip ${x === d ? 'on' : ''}" data-gd="${esc(x)}">${esc(ggLungo(x))}</button>`).join('')}</div>
+  <div class="filtri mt date-giro">${date.map((x) => `<button class="chip ${x === d ? 'on' : ''} ${x < og ? 'arretrato' : ''}" data-gd="${esc(x)}" ${x < og ? 'title="Giro passato con tappe ancora da fare"' : ''}>${esc(etichettaData(x))}</button>`).join('')}</div>
   ${filtriGiro}
   ${tappe.length ? `<div class="row mt"><a class="btn ink" href="${indirizzi.length ? percorso(indirizzi) : '#giro'}" target="_blank" rel="noopener">${ico('map')} Percorso a piedi (${indirizzi.length} da visitare)</a></div>
   ${indirizzi.length > 10 ? '<div class="avviso">Google Maps accetta al massimo 10 tappe per percorso: le altre si aprono dalla singola tappa.</div>' : ''}` : ''}
@@ -812,7 +821,7 @@ function vGiro() {
       return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${stampa.length} fogli A4${ai ? '' : ' · solo Google Maps'}</span></div>
       ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}.</div>` : ''}
       <div class="row mt"><button class="btn pri" data-stampa="${zid}" ${ST.pdf[zid] ? 'disabled' : ''}>Genera PDF</button><span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div></div>`;
-    })()}`; }).join('') || '<div class="vuoto">Nessuna tappa in questa data. Aggiungila con “+ Tappa”.</div>'}`;
+    })()}`; }).join('') || `<div class="vuoto">Nessuna tappa ${d === og ? 'oggi' : 'in questa data'}. Aggiungila con “+ Tappa”.${d === og && prossima ? `<div class="mt"><button class="btn" data-gd="${esc(prossima)}">Prossimo giro: ${esc(prossima === dm ? 'domani' : ggLungo(prossima))}</button></div>` : ''}</div>`}`;
 }
 /* sposta in blocco le tappe di un giro a un'altra data: tutte o solo quelle scelte */
 function formSpostaGiro() {
@@ -1286,6 +1295,8 @@ function legaVista(v) {
     $('#gAgg').onclick = scegliTappa;
     const gs = $('#gSposta'); if (gs) gs.onclick = formSpostaGiro;
     V.querySelectorAll('[data-gd]').forEach((b) => (b.onclick = () => { ST.giroData = b.dataset.gd; render(); }));
+    // la data selezionata resta sempre in vista al centro della fila, anche con molte date
+    { const on = V.querySelector('.date-giro .chip.on'); if (on) { const r = on.parentElement; r.scrollLeft += on.getBoundingClientRect().left - r.getBoundingClientRect().left - (r.clientWidth - on.offsetWidth) / 2; } }
     V.querySelectorAll('[data-fg]').forEach((b) => (b.onclick = () => { ST.fg[b.dataset.fg] = ST.fg[b.dataset.fg] === b.dataset.v ? '' : b.dataset.v; render(); }));
     V.querySelectorAll('[data-fgt]').forEach((b) => (b.onclick = () => { ST.fg[b.dataset.fgt] = !ST.fg[b.dataset.fgt]; render(); }));
     V.querySelectorAll('[data-su],[data-giu]').forEach((b) => (b.onclick = () => { const [zid, id] = (b.dataset.su || b.dataset.giu).split('|'); spostaTappa(zid, id, b.dataset.su ? -1 : 1); }));
@@ -1355,6 +1366,11 @@ function ricalcolaFinestra() {
 ['resize', 'orientationchange'].forEach((ev) => window.addEventListener(ev, () => { adattaAltezza(); setTimeout(adattaAltezza, 350); }));
 window.addEventListener('pageshow', () => setTimeout(ricalcolaFinestra, 50));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(ricalcolaFinestra, 200); });
+// iPhone tiene l'app in memoria per giorni: dopo 30 minuti in background il giro riparte da oggi
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { ST.nascosta = Date.now(); return; }
+  if (ST.nascosta && Date.now() - ST.nascosta > 30 * 60000) { ST.giroGiorno = null; if (location.hash.startsWith('#giro')) render(); }
+});
 document.addEventListener('focusout', (e) => { if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) setTimeout(() => { const a = document.activeElement; if (!a || !/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) ricalcolaFinestra(); }, 160); });
 [0, 300, 1000].forEach((t) => setTimeout(adattaAltezza, t));
 
