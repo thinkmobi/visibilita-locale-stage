@@ -2,6 +2,8 @@
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
 const VERSIONE = '0.19.0';
+/* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
+{ const sv = document.getElementById('splashV'); if (sv) sv.textContent = 'Versione ' + VERSIONE; }
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
 const CHIUSI = ['Vinto', 'Perso', 'Scartato'];
 // nomi vecchi degli stati: si leggono ancora e diventano quelli nuovi al primo salvataggio della zona
