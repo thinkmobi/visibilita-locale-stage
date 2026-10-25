@@ -177,17 +177,17 @@ def pagina(c, job, f, bg, firma):
     fy = MB + 2.4 * mm
     c.setStrokeColor(LINE); c.setLineWidth(.6); c.line(ML, fy + 4.2 * mm, W - MR, fy + 4.2 * mm)
     lx = ML
+    # prima voce: quadratino nero (rombo) come sulle mappe, la sede dell'attività
+    c.setFillColor(INK)
+    c.saveState(); c.translate(lx + 1.5 * mm, fy + 1.2 * mm); c.rotate(45); c.rect(-1.15 * mm, -1.15 * mm, 2.3 * mm, 2.3 * mm, stroke=0, fill=1); c.restoreState()
+    lx += 4.4 * mm
+    c.setFont("MOM", 7.4); c.drawString(lx, fy, "La vostra sede"); lx += c.stringWidth("La vostra sede", "MOM", 7.4) + 6 * mm
     for cols, b, r in [((1, 3), "Visibile", "1–3"), ((4, 5), "Poco visibile", "4–10"), ((6, 7), "Invisibile", "oltre 10 o assenti")]:
         c.setFillColor(R[cols[0]]); c.wedge(lx, fy - .3 * mm, lx + 3 * mm, fy + 2.7 * mm, 90, 180, stroke=0, fill=1)
         c.setFillColor(R[cols[1]]); c.wedge(lx, fy - .3 * mm, lx + 3 * mm, fy + 2.7 * mm, 270, 180, stroke=0, fill=1)
         lx += 4.4 * mm
         c.setFillColor(INK); c.setFont("MOM", 7.4); c.drawString(lx, fy, b); lx += c.stringWidth(b, "MOM", 7.4) + 1.6 * mm
         c.setFillColor(MUTE); c.setFont("MO", 7.4); c.drawString(lx, fy, r); lx += c.stringWidth(r, "MO", 7.4) + 6 * mm
-    # quadratino nero (rombo) come sulle mappe: la sede dell'attività
-    c.setFillColor(INK)
-    c.saveState(); c.translate(lx + 1.5 * mm, fy + 1.2 * mm); c.rotate(45); c.rect(-1.15 * mm, -1.15 * mm, 2.3 * mm, 2.3 * mm, stroke=0, fill=1); c.restoreState()
-    lx += 4.4 * mm
-    c.setFillColor(INK); c.setFont("MOM", 7.4); c.drawString(lx, fy, "La vostra sede")
     c.setFillColor(MUTE); c.setFont("MO", 7.4); c.drawRightString(W - MR, fy, "Dati pubblici di Google, non pubblicitari")
     bottom = fy + 4.2 * mm + 3.5 * mm
     # --- due mappe a sinistra, colonna dei messaggi a destra
