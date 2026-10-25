@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.20.2';
+const VERSIONE = '0.20.3';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 { const sv = document.getElementById('splashV'); if (sv) sv.textContent = 'Versione ' + VERSIONE; }
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
@@ -749,7 +749,13 @@ function vGiro() {
   // (es. dopo «Sposta giro», dove le consegnate restano alla data vecchia) sparisce; si riapre dal campo data
   const og = oggi();
   // all'apertura, al cambio di giorno e dopo una lunga pausa il giro riparte da oggi
-  if (ST.giroGiorno !== og || !ST.giroData) { ST.giroData = og; ST.giroGiorno = og; }
+  // con oggi vuoto si apre direttamente il prossimo giro con tappe da fare
+  if (ST.giroGiorno !== og || !ST.giroData) {
+    const prossimo = tt.filter((x) => x.p.giro.data > og && !x.p.giro.fatto && aperto(x.p)).map((x) => x.p.giro.data).sort()[0];
+    ST.giroData = tt.some((x) => x.p.giro.data === og) || !prossimo ? og : prossimo;
+    // la scelta diventa definitiva solo quando i dati sono arrivati (al primo disegno le zone possono essere ancora vuote)
+    if (Object.keys(ST.zone).length) ST.giroGiorno = og;
+  }
   const date = [...new Set(tt.filter((x) => x.p.giro.data >= og || (!x.p.giro.fatto && aperto(x.p))).map((x) => x.p.giro.data))];
   // oggi c'è sempre; la data scelta dal campo resta visibile finché è selezionata
   for (const x of [og, ST.giroData]) if (!date.includes(x)) date.push(x);
