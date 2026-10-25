@@ -4,7 +4,7 @@
   "start_url": "./#oggi",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F4F5F3",
+  "background_color": "#1F1E1B",
   "theme_color": "#FFFFFF",
   "lang": "it",
   "icons": [

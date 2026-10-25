@@ -243,6 +243,9 @@ body.largo .vista{padding-left:max(16px,env(safe-area-inset-left));padding-right
 /* splash di avvio AGENTICA: fondo inchiostro, logotipo negativo (avorio con barra clay) */
 .splash{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:#1F1E1B;pointer-events:none;opacity:1;transition:opacity .4s ease}
 .splash.via{opacity:0}
+/* durante lo splash pagina e barra di stato prendono il colore dello splash: iOS 26 tinge la barra di stato
+   e l'area sotto la barra Home con lo sfondo della pagina, che altrimenti è bianco */
+html.avvio,html.avvio body{background:#1F1E1B}
 .splash-v{position:absolute;left:0;right:0;bottom:calc(28px + env(safe-area-inset-bottom,0px));text-align:center;font:400 12px/1.5 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;color:#87867F}
 .splash-logo{width:min(64vw,320px);height:auto;max-width:100%}
 @media (prefers-reduced-motion: reduce){.splash{transition:none}}
