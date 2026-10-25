@@ -79,7 +79,7 @@ def testi(job, f, mm_, ma, debole):
     else:
         titolo = f"{dove} siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
     sub = f"Tra i primi 3: su Google Maps in {a} zone su {N} ({pc(a, N)}), su Google AI Mode in {b} ({pc(b, N)})."
-    lettura = "Ogni pallino è una zona: il numero è la vostra posizione su Google da quel punto. Il rombo nero è la vostra sede."
+    lettura = "Ogni pallino è una zona: il numero è la vostra posizione su Google da quel punto. Il quadratino nero è la vostra sede."
     # percentuale complementare a quella dell'anello della piattaforma debole: le due sommano sempre 100
     quota = f"{100 - su(dentro / N * 100)}%" if N else "0%"
     rischio = (quota, "delle zone: chi cerca da lì vede prima i vostri concorrenti e chiama loro.")
@@ -183,7 +183,12 @@ def pagina(c, job, f, bg, firma):
         lx += 4.4 * mm
         c.setFillColor(INK); c.setFont("MOM", 7.4); c.drawString(lx, fy, b); lx += c.stringWidth(b, "MOM", 7.4) + 1.6 * mm
         c.setFillColor(MUTE); c.setFont("MO", 7.4); c.drawString(lx, fy, r); lx += c.stringWidth(r, "MO", 7.4) + 6 * mm
-    c.setFont("MO", 7.4); c.drawRightString(W - MR, fy, "Dati pubblici di Google, non pubblicitari")
+    # quadratino nero (rombo) come sulle mappe: la sede dell'attività
+    c.setFillColor(INK)
+    c.saveState(); c.translate(lx + 1.5 * mm, fy + 1.2 * mm); c.rotate(45); c.rect(-1.15 * mm, -1.15 * mm, 2.3 * mm, 2.3 * mm, stroke=0, fill=1); c.restoreState()
+    lx += 4.4 * mm
+    c.setFillColor(INK); c.setFont("MOM", 7.4); c.drawString(lx, fy, "La vostra sede")
+    c.setFillColor(MUTE); c.setFont("MO", 7.4); c.drawRightString(W - MR, fy, "Dati pubblici di Google, non pubblicitari")
     bottom = fy + 4.2 * mm + 3.5 * mm
     # --- due mappe a sinistra, colonna dei messaggi a destra
     gap, gcol = 7 * mm, 8.5 * mm
