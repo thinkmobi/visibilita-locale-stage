@@ -348,6 +348,8 @@ test('10. versione: VERSIONE, CACHE e ?v= coincidono; la «v» compare solo nel 
   assert.match(v, /^0\.\d+\.\d+$/);
   const t = await apri({ vista: 'altro' });
   try {
+    // il Profilo si disegna dopo l'avvio: si aspetta che compaia il testo invece di leggerlo subito
+    await t.page.waitForFunction(() => /Versione v/.test(document.querySelector('#vista').innerText), null, { timeout: 8000 });
     assert.match(await testoVista(t.page), new RegExp(`Versione v${v.replace(/\./g, '\\.')}`));
   } finally { await t.chiudi(); }
 });

@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.19.0';
+const VERSIONE = '0.20.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 { const sv = document.getElementById('splashV'); if (sv) sv.textContent = 'Versione ' + VERSIONE; }
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
@@ -74,7 +74,7 @@ const ESITO_AZIONE = { 'Nessuna risposta': ['Richiamare', 1], 'Chiuso': ['Ripass
 const PRIORITA = ['1 Caldo', '2 Tiepido', '0 Invisibile', '3 Rete'];   // ordine di lavoro: prima i caldi
 const PRODOTTI = ['GBP SEO', 'SEO locale', 'AI SEO', 'InRete', 'Scheda PagineGialle', 'PgCasa', 'TuttoCittà', 'Display', 'Pacchetto misto'];
 const RETI = /tecnocasa|gabetti|tempocasa|re\/?max|engel|century ?21|grimaldi|coldwell|toscano|professionecasa|frimm|soloaffitti|fondocasa|affiliato|franchising/i;
-const MOTORE = ['motore/report.py', 'motore/importa.py', 'motore/siti.py', 'motore/requirements.txt', 'motore/salva.sh', 'motore/esegui_import.sh', 'motore/esegui_report.sh', 'motore/esegui_siti.sh',
+const MOTORE = ['motore/report.py', 'motore/foglio.py', 'motore/importa.py', 'motore/siti.py', 'motore/requirements.txt', 'motore/salva.sh', 'motore/esegui_import.sh', 'motore/esegui_report.sh', 'motore/esegui_siti.sh',
   ...['PlexCond-Bold', 'PlexCond-SemiBold', 'PlexMono-Bold', 'PlexMono-Medium', 'PlexMono-Regular', 'PlexSans-Bold', 'PlexSans-Medium', 'PlexSans-Regular', 'PlexSans-SemiBold', 'DejaVuSans'].map((f) => `motore/fonts/${f}.ttf`)];
 const WORKFLOW = { 'motore/workflows/report.yml': '.github/workflows/report.yml', 'motore/workflows/importa.yml': '.github/workflows/importa.yml', 'motore/workflows/siti.yml': '.github/workflows/siti.yml' };
 
@@ -190,7 +190,8 @@ function unisci(loc, rem) {
   const base = scansioneLoc ? lm : rm, testi = piuRecente(lm, rm);
   if (scansioneLoc && loc.punti) z.punti = loc.punti;
   z.meta = { ...base };
-  for (const k of ['frase_kw', 'centrata', 'luogo', 'prossimo_passo', 'quartiere', 'citta']) if (testi[k] !== undefined) z.meta[k] = testi[k];
+  if (rem.punti_ai && !scansioneLoc) for (const k of ['report_key_ai', 'data_ai']) if (rm[k] !== undefined) z.meta[k] = rm[k];
+  for (const k of ['frase_kw', 'centrata', 'luogo', 'prossimo_passo', 'quartiere', 'citta', 'categoria']) if (testi[k] !== undefined) z.meta[k] = testi[k];
   z.meta.u = Math.max(lm.u || 0, rm.u || 0);
   for (const k of ['prospect', 'registro']) {
     z[k] = { ...(rem[k] || {}) };
@@ -366,7 +367,7 @@ function badgeSito(z, p) {
 const PG = { assente: 'Assente su PG', base: 'PG base', evoluta: 'PG evoluta' };
 const urlPG = (z, p) => `https://www.paginegialle.it/ricerca/${encodeURIComponent(p.nome || '')}/${encodeURIComponent(z.meta.citta || '')}`;
 const badgePG = (p) => (PG[p.pg] ? `<span class="badge-pg pg-${p.pg}"><b>PG</b>${esc(PG[p.pg])}</span>` : '');
-const nonRiv = (z, p) => !!(p.pid && z.attivita && z.attivita[p.pid] && z.attivita[p.pid].c === false);
+const nonRiv = (z, p) => !!(p.pid && z.attivita && z.attivita[p.pid] && z.attivita[p.pid].c === false && z.attivita[p.pid].cv);
 // ultimo contatto registrato di un prospect (più recente per data, poi per ora di inserimento)
 const ultimoReg = (z, pid) => Object.values(z.registro || {}).filter((r) => !r.del && r.p === pid).sort((a, b) => (b.data + b.u > a.data + a.u ? 1 : -1))[0];
 // report completo richiesto e non ancora consegnato: ultimo esito "Fare report completo" o prossima azione sul report completo
@@ -512,7 +513,7 @@ function sezioneAI(z, p) {
 function apriProspect(zid, id, opz = {}) {
   const s = ST.zone[zid]; if (!s || !s.z.prospect[id]) { location.hash = '#prospect'; return; }
   const z = s.z, p = normStato(z.prospect[id]), a = z.attivita[p.pid] || {};
-  const m = p.pid && z.punti && z.attivita[p.pid] ? L.metriche(z, p.pid) : null;
+  const m = p.pid && z.punti && z.punti.length && z.attivita[p.pid] ? L.metriche(z, p.pid) : null;
   const reg = registro(zid, id);
   const t = p.telefono || a.t, sito = p.sito || a.w;
   const nav = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((p.indirizzo || a.a || p.nome))}`;
@@ -555,14 +556,7 @@ function apriProspect(zid, id, opz = {}) {
   ${reg.map((r) => `<div class="reg"><div class="riga"><b>${esc(r.esito || r.canale)}</b><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}</span></div>
      ${r.interlocutore ? `<div class="sub">con ${esc(r.interlocutore)}</div>` : ''}${r.emerso ? `<div>${esc(r.emerso)}</div>` : ''}${r.prossima ? `<div class="sub">→ ${esc(r.prossima)} ${r.entro ? 'entro ' + esc(gg(r.entro)) : ''}</div>` : ''}
      <div class="reg-az"><button class="btn mini" data-rmod="${esc(r.id)}">Modifica</button><button class="btn mini neg-t" data-rdel="${esc(r.id)}">Elimina</button></div></div>`).join('') || '<div class="sub">Nessun contatto registrato.</div>'}
-  ${an ? `<div class="eb">Report da stampare</div>
-  <label class="f"><input type="checkbox" data-r="includi" ${p.report && p.report.includi === false ? '' : 'checked'} style="display:inline;width:auto;margin-right:6px">Includi nella stampa del giro</label>
-  <label class="f">Titolo<textarea data-r="titolo">${esc(an.title)}</textarea></label>
-  <label class="f">Cosa vuol dire<textarea data-r="cosa" style="min-height:110px">${esc(an.cosa)}</textarea></label>
-  <div class="row mt"><button class="btn mini" id="bozza">Rigenera bozza dai dati</button><span class="sub">sovrascrive titolo e testo</span></div>
-  <div class="due"><label class="f">Nome breve in stampa<input id="breve" value="${esc(a.b || '')}"></label>
-  <label class="f">Riferimento${sel('luogo', L.LUOGHI, (p.report && p.report.luogo) || z.meta.luogo || 'ufficio').replace('data-c="luogo"', 'data-r="luogo"')}</label></div>
-  <label class="f">Sottotitolo<input data-r="sottotitolo" value="${esc(an.subtitle)}"></label>
+  ${an ? `<label class="f mt"><input type="checkbox" data-r="includi" ${p.report && p.report.includi === false ? '' : 'checked'} style="display:inline;width:auto;margin-right:6px">Includi nel PDF del giro</label>
   ` : ''}
   <div class="eb">Dati</div>
   ${inp('nome', 'Nome')}${inp('referente', 'Referente')}
@@ -753,7 +747,7 @@ function vGiro() {
   const tt = tutti().filter((x) => x.p.giro && x.p.giro.data);
   // nel menu delle date restano i giri da fare: una data passata con tutte le tappe consegnate
   // (es. dopo «Sposta giro», dove le consegnate restano alla data vecchia) sparisce; si riapre dal campo data
-  const date = [...new Set(tt.filter((x) => x.p.giro.data >= oggi() || !x.p.giro.fatto).map((x) => x.p.giro.data))].sort();
+  const date = [...new Set(tt.filter((x) => x.p.giro.data >= oggi() || (!x.p.giro.fatto && aperto(x.p))).map((x) => x.p.giro.data))].sort();
   if (ST.giroData && !date.includes(ST.giroData) && tt.some((x) => x.p.giro.data === ST.giroData)) date.push(ST.giroData), date.sort();
   if (!ST.giroData) ST.giroData = date.find((d) => d >= oggi()) || date[date.length - 1] || oggi();
   const d = ST.giroData;
@@ -847,11 +841,12 @@ function formSpostaGiro() {
       const z = ST.zone[zid].z, p = z.prospect[id];
       // le tappe spostate si accodano a quelle già previste nella nuova data
       p.giro = { ...p.giro, data: a, ordine: prossimoOrdine(zid, a) };
+      const campi = ['giro'];
       if (conAz) {
-        if (p.data_prossima === da) p.data_prossima = a;
-        if (p.visita_entro) p.visita_entro = piuGiorni(delta, p.visita_entro);
+        if (p.data_prossima === da) { p.data_prossima = a; campi.push('data_prossima'); }
+        if (p.visita_entro) { p.visita_entro = piuGiorni(delta, p.visita_entro); campi.push('visita_entro'); }
       }
-      tocca(p, 'giro', 'data_prossima', 'visita_entro'); zone.add(zid);
+      tocca(p, ...campi); zone.add(zid);
     }
     // rinumera le tappe rimaste nella data di partenza
     for (const zid of zone) {
@@ -1005,10 +1000,12 @@ function testiZona(zid) {
   <label class="f">Invito<textarea data-pp="outro">${esc(pp.outro)}</textarea></label>
   <div class="barra-salva"><button class="btn annulla neutro" id="tChiudi">Chiudi</button><button class="btn pri" disabled>Si salva a ogni modifica</button></div>`, () => apriZona(zid));
   $('#tChiudi', f).onclick = () => apriZona(zid);
-  const salva = () => { m.u = ora(); modificato(zid); statoBarra(f, 'salvato'); };
-  f.querySelectorAll('[data-m]').forEach((el) => (el.onchange = () => { m[el.dataset.m] = el.value; salva(); }));
-  f.querySelectorAll('[data-pp]').forEach((el) => (el.onchange = () => { pp[el.dataset.pp] = el.value; salva(); }));
-  f.querySelectorAll('[data-it]').forEach((el) => (el.onchange = () => { const [i, j] = el.dataset.it.split('|'); pp.items[i][j] = el.value; salva(); }));
+  const meta = () => ST.zone[zid].z.meta;
+  const ppOra = () => { const mm = meta(); if (!mm.prossimo_passo) mm.prossimo_passo = JSON.parse(JSON.stringify(pp)); return mm.prossimo_passo; };
+  const salva = () => { meta().u = ora(); modificato(zid); statoBarra(f, 'salvato'); };
+  f.querySelectorAll('[data-m]').forEach((el) => (el.onchange = () => { meta()[el.dataset.m] = el.value; salva(); }));
+  f.querySelectorAll('[data-pp]').forEach((el) => (el.onchange = () => { ppOra()[el.dataset.pp] = el.value; salva(); }));
+  f.querySelectorAll('[data-it]').forEach((el) => (el.onchange = () => { const [i, j] = el.dataset.it.split('|'); ppOra().items[i][j] = el.value; salva(); }));
 }
 function formScansione() {
   const f = apriFoglio('Nuova zona da Local Falcon', `
@@ -1036,7 +1033,7 @@ function formScansione() {
     try {
       await GH.putJSON(`zone/${id}/richiesta.json`, rq, await GH.sha(`zone/${id}/richiesta.json`), `Richiesta import ${id}`);
       out.textContent = 'Richiesta inviata. Import in corso su GitHub (1-3 minuti): puoi chiudere, la zona compare da sola.';
-      attendiImport(id, k, out);
+      attendiImport(id, k, out, rq.creata);
     } catch (e) { out.innerHTML = `<span class="c-neg">${esc(e.message)}</span>`; }
   };
 }
@@ -1072,6 +1069,8 @@ async function attendiImport(id, k, out, creata = null) {
       if (e.data.stato === 'ok') {
         await scarica();
         const z = ST.zone[id]; if (z && !z.z.meta.luogo) { const rq = await GH.getJSON(`zone/${id}/richiesta.json`); z.z.meta.luogo = rq && rq.data.luogo || 'ufficio'; z.z.meta.u = ora(); modificato(id); }
+        const avAI = (e.data.avviso || '').split('; ').find((x) => x.startsWith('AI Mode non importato'));
+        if (avAI) { const m = `Zona importata, ma ${avAI.replace('AI Mode non importato', 'AI Mode non è stato importato')}.`; if (out) out.innerHTML = `<span class="c-neg">${esc(m)}</span>`; else toast(m, 8000); return; }
         toast(`Zona importata: ${e.data.attivita} attività`); if (out) out.textContent = 'Zona importata.'; return;
       }
       if (out) out.innerHTML = `<span class="c-neg">Import non riuscito: ${esc(e.data.messaggio)}</span>`; else toast('Import non riuscito: ' + e.data.messaggio, 6000);

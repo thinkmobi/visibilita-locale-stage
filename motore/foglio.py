@@ -179,9 +179,10 @@ def pagina(c, job, f, bg, firma):
     nome = f.get("nome") or ""
     fn = 22
     while c.stringWidth(nome, "C", fn) > W * .62 and fn > 14: fn -= .5
+    nome = taglia(c, nome, "C", fn, W * .62)
     c.setFillColor(INK); c.setFont("C", fn); c.drawString(ML, top - 4.6 * mm - fn * .78, nome)
     ya = top - 4.6 * mm - fn * .78 - 5.2 * mm
-    c.setFillColor(MUTE); c.setFont("MO", 8.6); c.drawString(ML, ya, f.get("indirizzo") or "")
+    c.setFillColor(MUTE); c.setFont("MO", 8.6); c.drawString(ML, ya, taglia(c, f.get("indirizzo") or "", "MO", 8.6, W * .55))
     kw = f"«{job.get('keyword', '')}»"
     c.setFillColor(INK); c.setFont("C", 16); c.drawRightString(W - MR, ya, kw)
     spaced(c, W - MR, ya + 6.2 * mm, "Abbiamo cercato su Google", "MOB", 7.2, MUTE, right=True)
@@ -287,6 +288,14 @@ def pagina(c, job, f, bg, firma):
     c.setFillColor(white); c.setFont("CS", 13.5); c.drawString(ix + 6 * mm, yc + 8.6 * mm, firma["telefono"])
     c.setFillColor(OKIC); c.setFont("DJ", 10); c.drawString(ix, yc + 3 * mm, "✉")
     c.setFillColor(white); c.setFont("CS", 11); c.drawString(ix + 6 * mm, yc + 3 * mm, firma["email"])
+
+
+def taglia(c, t, font, size, w):
+    """accorcia con … finché il testo sta in w"""
+    if c.stringWidth(t, font, size) <= w: return t
+    while t and c.stringWidth(t + "…", font, size) > w: t = t[:-1]
+    if t != "": AVVISI_F.append("nome o indirizzo lungo accorciato nel foglio")
+    return t.rstrip(" ,.;:-–·|") + "…"
 
 
 def draw(c, p, x, ytop, w):

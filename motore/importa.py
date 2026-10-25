@@ -99,6 +99,7 @@ def zona_da_report(d, rq, esistente=None, avvisi=None):
         "data": data, "data_testo": data_testo, "lat": num(d.get("lat")), "lng": num(d.get("lng")),
         "griglia": grid, "lato": f"{lato} × {lato} km", "report_key": d.get("report_key"),
         "prossimo_passo": meta.get("prossimo_passo") or rq.get("prossimo_passo") or PROSSIMO_PASSO,
+        "luogo": rq.get("luogo") or meta.get("luogo") or "ufficio",
         "u": int(time.time() * 1000)})
     att = z.get("attivita") or {}
     ora = int(time.time() * 1000)   # i dati appena importati vincono sulle copie locali dell'app
@@ -152,7 +153,9 @@ def abbina(nome, indice, punto=None):
     if k in indice["esatto"]: return indice["esatto"][k]
     # AI Mode cita spesso il marchio ("Torino Case", "Toscano"): vale se la frase intera compare in un solo nome Maps
     f = _frase(nome)
-    if len(f) >= 5 and indice.get("frasi"):
+    generiche = {"agenzia", "agenzie", "immobiliare", "immobiliari", "studio", "scuola", "centro", "istituto", "torino", "di", "e",
+                 "real", "estate", "group", "srl", "sas", "snc", "spa"}
+    if len(f) >= 5 and indice.get("frasi") and any(w not in generiche for w in f.split()):
         cand = {pid for ff, pid in indice["frasi"] if f" {f} " in f" {ff} "}
         if len(cand) == 1: return cand.pop()
         if len(cand) > 1:

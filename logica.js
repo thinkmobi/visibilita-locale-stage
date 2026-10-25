@@ -142,7 +142,7 @@
       ],
       list_title: r.titolo_lista || L.titoloLista(z, p),
       list_head: L.testaLista(z, p),
-      unclaimed: a.c === false,
+      unclaimed: a.c === false && !!a.cv,
       list: L.classifica(z, p).righe,
       cosa: r.cosa || b.cosa,
       method: `Rilevazione del ${z.meta.data_testo} sui risultati pubblici di Google Maps, quelli che vede chiunque faccia una ricerca: ` +
