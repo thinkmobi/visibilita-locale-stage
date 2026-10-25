@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.18.0';
+const VERSIONE = '0.19.0';
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
 const CHIUSI = ['Vinto', 'Perso', 'Scartato'];
 // nomi vecchi degli stati: si leggono ancora e diventano quelli nuovi al primo salvataggio della zona
@@ -411,7 +411,7 @@ function vOggi() {
     .sort((a, b) => prioRank(a.p) - prioRank(b.p));
   const fatti = tt.filter(sentitoOggi);
   const ultimoOggi = (x) => registro(x.zid, x.p.id).find((r) => r.data === d);
-  const tappa = (x) => `<div class="riga" style="margin-top:4px"><span class="sub">${esc(x.p.giro.orario || '')}${x.p.giro.orario ? ' · ' : ''}tappa ${numTappa[x.zid + '|' + x.p.id] || ''}</span>${ripassare(x.z, x.p) ? '<span class="stato-tappa ripassare">↻ Da ripassare</span>' : '<span class="stato-tappa">Da visitare</span>'}</div>`;
+  const tappa = (x) => `<div class="riga" style="margin-top:4px"><span class="sub">${esc(x.p.giro.orario || '')}${x.p.giro.orario ? ' · ' : ''}tappa ${numTappa[x.zid + '|' + x.p.id] || ''}</span>${ripassare(x.z, x.p) ? '<span class="stato-tappa ripassare">↻ Ripassare</span>' : '<span class="stato-tappa">Visitare</span>'}</div>`;
   const esitoOggi = (x) => { const r = ultimoOggi(x); return `<div class="riga" style="margin-top:4px">${x.p.giro && x.p.giro.data === d && x.p.giro.fatto ? '<span class="stato-tappa consegnata">✓ Consegnato</span>' : ''}${r ? `<span class="sub">Oggi: ${esc(r.esito)}</span>` : ''}</div>`; };
   const vuoto = !giroDaFare.length && !richiami.length;
   return `${kpi}
@@ -496,21 +496,16 @@ function minigriglia(z, pid, opz = {}) {
   const idx = z.punti.map((pt, i) => i).sort((a, b) => (z.punti[b][0] - z.punti[a][0]) || (z.punti[a][1] - z.punti[b][1]));
   const rows = []; for (let i = 0; i < idx.length; i += n) rows.push(idx.slice(i, i + n).sort((a, b) => z.punti[a][1] - z.punti[b][1]));
   const cl = (r) => (!r ? 'g-no' : r === 1 ? 'g-1' : r === 2 ? 'g-2' : r === 3 ? 'g-3' : r <= 6 ? 'g-y' : r <= 10 ? 'g-o' : 'g-r');
-  return `<div class="griglia" style="grid-template-columns:repeat(${n},1fr)">${rows.flat().map((i) => { const r = m.ranks[i]; return `<i class="${cl(r)}${opz.ai && m.perse[i] ? ' perso' : ''}">${r || ''}</i>`; }).join('')}</div>` + (opz.ai ? '' : `<div class="griglia-legenda"><span><i style="background:var(--g1)"></i>1-3 visibile</span><span><i style="background:var(--y)"></i>4-10 poco visibile</span><span><i style="background:var(--r1)"></i>11-20 invisibile</span><span><i style="background:var(--r2)"></i>assente</span></div>`);
+  return `<div class="griglia" style="grid-template-columns:repeat(${n},1fr)">${rows.flat().map((i) => { const r = m.ranks[i]; return `<i class="${cl(r)}">${r || ''}</i>`; }).join('')}</div>` + (opz.ai ? '' : `<div class="griglia-legenda"><span><i style="background:var(--g1)"></i>1-3 visibile</span><span><i style="background:var(--y)"></i>4-10 poco visibile</span><span><i style="background:var(--r1)"></i>11-20 invisibile</span><span><i style="background:var(--r2)"></i>assente</span></div>`);
 }
 /* scheda cliente: Google AI Mode sulla stessa griglia, con le zone perse rispetto a Maps */
 function sezioneAI(z, p) {
-  if (!p.pid || !z.attivita[p.pid]) return '';
-  if (!L.haAI(z)) return `<div class="eb">Google AI Mode</div><div class="sub">Scansione AI Mode non importata per questa zona: la aggiungi da Zone → Nuova zona, con la stessa report key Maps più quella AI Mode.</div>`;
-  const a = L.metricheAI(z, p.pid), mm = L.metriche(z, p.pid), pc = (n) => Math.round(n / a.N * 100);
+  if (!p.pid || !z.attivita[p.pid] || !L.haAI(z)) return '';
+  const a = L.metricheAI(z, p.pid), pc = (n) => Math.round(n / a.N * 100);
   return `<div class="eb">Google AI Mode · «${esc(z.meta.keyword)}»</div>
   <div class="stat"><div><b class="c-${L.colorePct(pc(a.top3))}">${a.top3}/${a.N}</b><span>tra le prime 3</span></div>
-  <div><b class="c-${L.colorePct(pc(a.top20))}">${a.top20}/${a.N}</b><span>citata</span></div>
-  <div><b>${a.arp ? Math.ceil(a.arp - 1e-9) + 'ª' : '—'}</b><span>posizione media${a.top20 && a.top20 < a.N ? ' dove citata' : ''}</span></div>
-  <div><b class="${a.nPerse ? 'c-neg' : ''}">${a.nPerse}</b><span>zone perse</span></div></div>
-  <div class="mt">${minigriglia(z, p.pid, { ai: true })}</div>
-  <div class="griglia-legenda"><span><i class="perso-ico"></i>tratteggio: tra le prime 3 su Maps, non su AI Mode</span>${z.meta.data_ai ? `<span>rilevazione AI del ${esc(gg(z.meta.data_ai))}</span>` : ''}</div>
-  ${a.nPerse ? `<div class="avviso">Su Maps è tra le prime 3 in ${mm.top3} zone, su AI Mode in ${a.top3}: ${a.nPerse} zone (${pc(a.nPerse)}%) in cui chi cerca con l'intelligenza artificiale di Google vede prima i concorrenti.</div>` : ''}`;
+  <div><b class="c-${L.colorePct(pc(a.top20))}">${a.top20}/${a.N}</b><span>presente</span></div></div>
+  <div class="mt">${minigriglia(z, p.pid, { ai: true })}</div>`;
 }
 function apriProspect(zid, id, opz = {}) {
   const s = ST.zone[zid]; if (!s || !s.z.prospect[id]) { location.hash = '#prospect'; return; }
@@ -547,10 +542,10 @@ function apriProspect(zid, id, opz = {}) {
     <label class="f">Priorità${sel('priorita', PRIORITA, p.priorita, prioTesto)}</label></div>
     <div class="scelte">${[0, 1, 3, 7].map((n) => `<button class="chip" data-quando="${n}">${n === 0 ? 'Oggi' : n === 1 ? 'Domani' : '+' + n + ' gg'}</button>`).join('')}</div>
   </div>
-  ${m ? `<div class="eb">Visibilità su «${esc(z.meta.keyword)}»</div>
+  ${m ? `<div class="eb">Google Maps · «${esc(z.meta.keyword)}»</div>
   <div class="stat"><div><b class="c-${L.colorePct(Math.round(m.top3 / m.N * 100))}">${m.top3}/${m.N}</b><span>tra le prime 3</span></div>
-  <div><b class="c-${L.colorePct(Math.round(m.top20 / m.N * 100))}">${m.top20}/${m.N}</b><span>tra le prime 20</span></div>
-  <div><b>${m.atrp ? L.virgola(m.atrp) : '—'}</b><span>posizione media</span></div><div><b>${a.rv ?? '—'}</b><span>recensioni ${L.virgola(a.r)}</span></div></div>
+  <div><b class="c-${L.colorePct(Math.round(m.top20 / m.N * 100))}">${m.top20}/${m.N}</b><span>presente</span></div>
+  <div><b>${a.rv ?? '—'}</b><span>recensioni ${L.virgola(a.r)}</span></div></div>
   <div class="mt">${minigriglia(z, p.pid)}</div>
   ${sezioneAI(z, p)}
   ${an ? `<div class="box classifica"><b>${esc(an.list_title)}</b><table class="cl">${an.list.map(([r, n, rv, me]) => `<tr class="${me ? 'me' : ''}"><td>${r || '20+'}</td><td>${esc(n)}</td><td style="text-align:right" class="mono">${esc(rv)}</td></tr>`).join('')}</table></div>` : ''}` : '<div class="avviso mt">Attività non presente nella scansione della zona: niente metriche né report.</div>'}
@@ -768,8 +763,8 @@ function vGiro() {
   const etichettaTappa = (x) => nonInteressato(x.z, x.p) ? '<span class="stato-tappa ni">✕ Non interessato</span>'
     : reportCompleto(x.z, x.p) ? '<span class="stato-tappa rc">Report completo</span>'
     : x.p.giro.fatto ? `<span class="stato-tappa consegnata">✓ Consegnato${x.p.giro.fatto_il ? ' il ' + gg(x.p.giro.fatto_il) : ''}</span>`
-    : daRipassare(x) ? '<span class="stato-tappa ripassare">↻ Da ripassare</span>'
-    : contattata(x) ? '<span class="stato-tappa visitata">✓ Visitato</span>' : '<span class="stato-tappa">Da visitare</span>';
+    : daRipassare(x) ? '<span class="stato-tappa ripassare">↻ Ripassare</span>'
+    : contattata(x) ? '<span class="stato-tappa visitata">✓ Visitato</span>' : '<span class="stato-tappa">Visitare</span>';
   const passa = (x) => (fg.tappa === 'ni' || inLavoro(x)) && (!fg.tappa || (fg.tappa === 'da' ? !x.p.giro.fatto && !contattata(x) : fg.tappa === 'ripassare' ? daRipassare(x) : fg.tappa === 'rc' ? reportCompleto(x.z, x.p) : fg.tappa === 'ni' ? nonInteressato(x.z, x.p) : fg.tappa === 'fatte' ? x.p.giro.fatto : fg.tappa === 'contattate' ? contattata(x) && !x.p.giro.fatto : true))
     && (!fg.prio || x.p.priorita === fg.prio) && (!fg.nr || nonRiv(x.z, x.p)) && (!fg.pg || x.p.pg === 'assente');
   const tappe = tutte.filter(passa);
@@ -777,7 +772,7 @@ function vGiro() {
   // conteggi dei filtri sulle tappe in lavoro; i non interessati si contano solo nel loro filtro
   const nF = (fn) => tutte.filter((x) => inLavoro(x) && fn(x)).length; const nNI = tutte.length - nF(() => true);
   const chipG = (k, v, lab) => `<button class="chip ${fg[k] === v ? 'on' : ''}" data-fg="${k}" data-v="${esc(v)}">${lab}</button>`;
-  const filtriGiro = tutte.length ? `<div class="filtri mt">${chipG('tappa', '', `Tutte (${nF(() => true)})`)}${chipG('tappa', 'da', `Da visitare (${nF((x) => !x.p.giro.fatto && !contattata(x))})`)}${chipG('tappa', 'contattate', `Contattate (${nF((x) => contattata(x) && !x.p.giro.fatto)})`)}${nF((x) => reportCompleto(x.z, x.p)) ? chipG('tappa', 'rc', `Report completo (${nF((x) => reportCompleto(x.z, x.p))})`) : ''}${nNI ? chipG('tappa', 'ni', `Non interessati (${nNI})`) : ''}${nF(daRipassare) ? chipG('tappa', 'ripassare', `Da ripassare (${nF(daRipassare)})`) : ''}${chipG('tappa', 'fatte', `Consegnate (${nF((x) => x.p.giro.fatto)})`)}</div>
+  const filtriGiro = tutte.length ? `<div class="filtri mt">${chipG('tappa', '', `Tutte (${nF(() => true)})`)}${chipG('tappa', 'da', `Visitare (${nF((x) => !x.p.giro.fatto && !contattata(x))})`)}${chipG('tappa', 'contattate', `Contattate (${nF((x) => contattata(x) && !x.p.giro.fatto)})`)}${nF((x) => reportCompleto(x.z, x.p)) ? chipG('tappa', 'rc', `Report completo (${nF((x) => reportCompleto(x.z, x.p))})`) : ''}${nNI ? chipG('tappa', 'ni', `Non interessati (${nNI})`) : ''}${nF(daRipassare) ? chipG('tappa', 'ripassare', `Ripassare (${nF(daRipassare)})`) : ''}${chipG('tappa', 'fatte', `Consegnate (${nF((x) => x.p.giro.fatto)})`)}</div>
   <div class="filtri">${chipG('prio', '', 'Ogni priorità')}${PRIORITA.filter((s) => tutte.some((x) => x.p.priorita === s)).map((s) => chipG('prio', s, prioHtml(s))).join('')}<button class="chip chip-nr ${fg.nr ? 'on' : ''}" data-fgt="nr">Non rivendicate (${nF((x) => nonRiv(x.z, x.p))})</button><button class="chip chip-pg ${fg.pg ? 'on' : ''}" data-fgt="pg">Assenti su PG (${nF((x) => x.p.pg === 'assente')})</button></div>
   ${fg.tappa !== 'ni' && tappe.length < nF(() => true) ? `<div class="sub" style="margin:2px 0 4px">${tappe.length} di ${nF(() => true)} tappe con questi filtri</div>` : ''}` : '';
   const indirizzi = tappe.filter((x) => !x.p.giro.fatto && inLavoro(x)).map((x) => x.p.indirizzo || (x.z.attivita[x.p.pid] || {}).a).filter(Boolean);
@@ -791,7 +786,7 @@ function vGiro() {
   ${tappe.length ? `<div class="row mt"><a class="btn ink" href="${indirizzi.length ? percorso(indirizzi) : '#giro'}" target="_blank" rel="noopener">${ico('map')} Percorso a piedi (${indirizzi.length} da visitare)</a></div>
   ${indirizzi.length > 10 ? '<div class="avviso">Google Maps accetta al massimo 10 tappe per percorso: le altre si aprono dalla singola tappa.</div>' : ''}` : ''}
   ${ST.mappaGiro.length ? `<div class="mappa-giro mt" id="mappaGiro" role="img" aria-label="Mappa delle tappe del giro"></div>
-  <div class="sub mappa-legenda"><span class="mg-pin">1</span> da visitare <span class="mg-pin vis">2</span> visitato <span class="mg-pin rip">3</span> da ripassare <span class="mg-pin rc">4</span> report completo <span class="mg-pin ni">✕</span> non interessato <span class="mg-pin fatto">✓</span> consegnato${senzaCoord ? ` · ${senzaCoord} tappe senza posizione` : ''}</div>` : ''}
+  <div class="sub mappa-legenda"><span class="mg-pin">1</span> visitare <span class="mg-pin vis">2</span> visitato <span class="mg-pin rip">3</span> ripassare <span class="mg-pin rc">4</span> report completo <span class="mg-pin ni">✕</span> non interessato <span class="mg-pin fatto">✓</span> consegnato${senzaCoord ? ` · ${senzaCoord} tappe senza posizione` : ''}</div>` : ''}
   ${Object.entries(perZona).map(([zid, arr]) => { const tutteZ = tutte.filter((x) => x.zid === zid); return `
     <div class="eb">${esc(ST.zone[zid].z.meta.quartiere)} · ${tutteZ.length} tappe pianificate · ${tutteZ.filter((x) => x.p.giro.fatto).length} consegnate</div>
     <div class="lista">${arr.map((x) => {
@@ -813,15 +808,11 @@ function vGiro() {
       const arr = tutteZ;
       const stampa = arr.filter((x) => x.p.pid && x.z.attivita[x.p.pid] && !(x.p.report && x.p.report.includi === false));
       const fuori = arr.filter((x) => !(x.p.pid && x.z.attivita[x.p.pid]));
-      const ai = L.haAI(ST.zone[zid].z), dis = ST.pdf[zid] ? 'disabled' : '';
-      // con la scansione AI Mode i fogli da lasciare sono la stampa principale; il report classico resta come seconda scelta
-      const btnFogli = `<button class="btn ${ai ? 'pri' : ''}" data-fogli="${zid}" ${dis || !ai ? 'disabled' : ''}>Fogli da lasciare</button>`;
-      const btnGiro = `<button class="btn ${ai ? '' : 'pri'}" data-stampa="${zid}" ${dis}>${ai ? 'Report classico' : 'Genera PDF'}</button>`;
-      return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${ai ? `${stampa.length} fogli A4 orizzontali` : `${stampa.length} analisi · ${Math.ceil(stampa.length / 2)} fogli A4`}</span></div>
-      ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}. Porta per loro la mappa della zona o un'analisi a parte.</div>` : ''}
-      <div class="sub">${ai ? 'Fogli da lasciare: uno per tappa, Google Maps contro AI Mode, nell\'ordine del giro.' : 'Il PDF esce nell\'ordine del giro: taglia la risma a metà e metti la pila inferiore sotto quella superiore.'}</div>
-      <div class="row mt">${ai ? btnFogli + btnGiro : btnGiro + btnFogli}<span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div>
-      ${ai ? '<div class="sub">Report classico: due analisi per foglio A4, solo Google Maps.</div>' : '<div class="sub">Fogli da lasciare non disponibili: manca la scansione AI Mode della zona (Zone → dettaglio zona → Aggiungi AI Mode).</div>'}</div>`;
+      const ai = L.haAI(ST.zone[zid].z);
+      // un solo pulsante: con la scansione AI Mode escono i fogli (uno per tappa), senza esce il report del giro
+      return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${ai ? `${stampa.length} fogli A4` : `${Math.ceil(stampa.length / 2)} fogli A4`}</span></div>
+      ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}.</div>` : ''}
+      <div class="row mt"><button class="btn pri" data-stampa="${zid}" ${ST.pdf[zid] ? 'disabled' : ''}>Genera PDF</button><span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div></div>`;
     })()}`; }).join('') || '<div class="vuoto">Nessuna tappa in questa data. Aggiungila con “+ Tappa”.</div>'}`;
 }
 /* sposta in blocco le tappe di un giro a un'altra data: tutte o solo quelle scelte */
@@ -890,7 +881,7 @@ async function generaPdf(zid, tipo = 'giro') {
   // lo stato vive in ST: se la vista si ricostruisce durante l'attesa il messaggio e il pulsante "Apri" restano
   const out = { set textContent(t) { scrivi(esc(t)); }, set innerHTML(h) { scrivi(h); } };
   const scrivi = (h) => { ST.pdfMsg[zid] = h; const o = $('#st-' + zid); if (o) o.innerHTML = h; };
-  const blocca = (on) => { ST.pdf[zid] = on; document.querySelectorAll(`[data-stampa="${zid}"],[data-fogli="${zid}"]`).forEach((b) => { b.disabled = on || (b.dataset.fogli && !L.haAI(ST.zone[zid].z)); }); };
+  const blocca = (on) => { ST.pdf[zid] = on; const b = document.querySelector(`[data-stampa="${zid}"]`); if (b) b.disabled = on; };
   if (!GH.ok()) { toast('Serve il collegamento GitHub'); return; }
   const z = ST.zone[zid].z;
   const ps = tutti().filter((x) => x.zid === zid && x.p.giro && x.p.giro.data === ST.giroData && x.p.pid && z.attivita[x.p.pid] && !(x.p.report && x.p.report.includi === false))
@@ -904,7 +895,7 @@ async function generaPdf(zid, tipo = 'giro') {
     out.textContent = 'Invio…';
     await invia(zid);
     const sha = await GH.sha(`zone/${zid}/stampa.json`);
-    await GH.putJSON(`zone/${zid}/stampa.json`, job, sha, tipo === 'fogli' ? `Fogli da lasciare ${ST.giroData}` : `Stampa giro ${ST.giroData}`);
+    await GH.putJSON(`zone/${zid}/stampa.json`, job, sha, `Stampa giro ${ST.giroData}`);
     out.textContent = 'In generazione (circa un minuto)…';
     const t0 = ora();
     // attesa breve che si interrompe quando l'app torna in primo piano: il controllo riparte subito
@@ -1299,8 +1290,7 @@ function legaVista(v) {
     V.querySelectorAll('[data-fatto]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.fatto.split('|'); formContatto(zid, id, { canale: 'Passaggio', esito: 'Report consegnato', giro: true, ritorno: '#giro' }); }));
     V.querySelectorAll('[data-annulla]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.annulla.split('|'); const p = ST.zone[zid].z.prospect[id]; aggiorna(zid, id, { giro: { ...p.giro, fatto: false, fatto_il: '' } }); ST.restaScroll = true; render(); }));
     V.querySelectorAll('[data-togli]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.togli.split('|'); const d = (ST.zone[zid].z.prospect[id].giro || {}).data; aggiorna(zid, id, { giro: {} }); rinumera(zid, d); modificato(zid); ST.restaScroll = true; render(); }));
-    V.querySelectorAll('[data-stampa]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.stampa)));
-    V.querySelectorAll('[data-fogli]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.fogli, 'fogli')));
+    V.querySelectorAll('[data-stampa]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.stampa, L.haAI(ST.zone[b.dataset.stampa].z) ? 'fogli' : 'giro')));
   }
   if (v === 'zone') {
     $('#nuovaScan').onclick = formScansione;

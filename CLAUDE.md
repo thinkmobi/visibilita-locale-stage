@@ -30,7 +30,7 @@ Questo repo contiene solo codice. I dati stanno nel repo privato `thinkmobi/visi
 - Deve funzionare su iPhone (viewport 390×664) e su computer; la Tabella solo da 900 px.
 - Palette: ink #18232A, sfondo #F4F5F3, verdi #1E8E3E/#34A853, giallo #F6C026, arancione #F29529, rossi #E8603C/#C5221F, blu #1A73E8.
 - Alert con i colori della palette in versione chiara, mai pieni.
-- Etichette di stato che descrivono l'azione reale («Consegnato», «Da visitare»), mai «Fatto».
+- Etichette di stato che descrivono l'azione reale («Consegnato», «Visitare», «Ripassare»), mai «Fatto».
 - Orari a 24 ore, fuso Europe/Rome.
 - Priorità: 1 Caldo (verde), 2 Tiepido (arancione), 0 Invisibile (blu), 3 Rete (grigio). Invisibile con almeno 20 recensioni → Caldo.
 - Posizioni in cifre («al 6° posto»), via `L.alPosto`.

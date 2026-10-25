@@ -71,7 +71,7 @@ function costruisciTabelle(zone, oggi) {
 function quartiere(z) { return ((z.meta || {}).quartiere) || z.id || ''; }
 function data(s) { if (!s) return ''; const [a, m, g] = String(s).split('-'); return g ? `${g}/${m}/${a}` : s; }
 function piuGiorni(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
-function statoTappa(x) { return x.p.giro.fatto ? 'Consegnato' : x.contOggi ? 'Contattato' : 'Da visitare'; }
+function statoTappa(x) { return x.p.giro.fatto ? 'Consegnato' : x.contOggi ? 'Contattato' : 'Visitare'; }
 
 /* ---------- parte Google ---------- */
 function onOpen() {

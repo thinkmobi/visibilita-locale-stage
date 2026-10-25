@@ -211,7 +211,7 @@ test('9. regole di interfaccia: etichette di stato, posizioni in cifre, «rivend
   try {
     await attendiStato(t.page, /Aggiornato/);
     const giro = await testoVista(t.page);
-    assert.match(giro, /Da visitare/);
+    assert.match(giro, /Visitare/);
     assert.doesNotMatch(giro, /\bFatto\b/);
     await t.page.locator('.tab a[data-t=prospect]').click();
     await t.page.waitForSelector('a.card');
