@@ -259,3 +259,16 @@ html.avvio,html.avvio body{background:#1F1E1B}
 /* iOS 26: sotto la barra di stato compariva una sfumatura (bordo di scorrimento). Una striscia fissa e piena
    che tocca il bordo alto fa tingere a iOS la barra di stato di bianco pieno, come la testata */
 body::before{content:"";position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top,0px) + 1px);background:#fff;z-index:6;pointer-events:none}
+
+/* ambiente: etichetta sullo splash, nella testata (solo stage) e nel Profilo */
+.amb{display:inline-block;padding:2px 8px;border-radius:10px;font:600 11px/1.4 ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;vertical-align:middle}
+.amb-prod{background:#E6F4EA;color:#1E8E3E;border:1px solid #34A853}
+.amb-stage{background:#FEF4E8;color:#A85F00;border:1px solid #F29529}
+.splash-v .amb{display:block;width:max-content;margin:0 auto 8px;font-size:12px;padding:3px 10px}
+.splash-v .amb-prod{background:transparent;color:#87867F;border-color:#4A4945}
+.splash-v .amb-stage{background:transparent;color:#F29529;border-color:#F29529}
+.amb-top{display:none;margin-left:2px}
+html[data-amb="stage"] .amb-top{display:inline-block}
+/* stage: bordo arancione sotto la testata, si vede in ogni schermata */
+html[data-amb="stage"] .top{border-bottom:3px solid #F29529}
+.amb-avviso{margin:0 0 12px;padding:10px 12px;background:#FCE8E6;color:#C5221F;border:1px solid #E8603C;border-radius:var(--r);font-size:13px;line-height:1.4}

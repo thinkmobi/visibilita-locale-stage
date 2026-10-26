@@ -13,7 +13,8 @@ const { ID, zona } = require('./fixture/zona.js');
 const OGGI = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 const LEAFLET = path.join(__dirname, 'vendor', 'leaflet');
 const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-const SESSIONE = { owner: 'prova', repo: 'visibilita-dati-stage', token: 'github_pat_finto_solo_per_i_test' };
+// il banco serve l'app dalla radice, cioè come produzione: i dati finti hanno quindi il nome di quelli di produzione
+const SESSIONE = { owner: 'prova', repo: 'visibilita-dati', token: 'github_pat_finto_solo_per_i_test' };
 
 let web, browser;
 test.before(async () => { web = await avvia(); browser = await chromium.launch(); });
@@ -335,6 +336,18 @@ test('9d. stati «Vinto» e «Perso»: i vecchi «Chiuso vinto/Chiuso perso» si
     assert.equal(dati.prospect.p3.stato, 'Vinto');
     assert.equal(dati.prospect.p4.stato, 'Perso');
     assert.deepEqual(t.errori, []);
+  } finally { await t.chiudi(); }
+});
+
+test('10b. ambiente: la produzione collegata ai dati di stage mostra l’avviso rosso chiaro; con i dati giusti nessun avviso', async () => {
+  const t = await apri();
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    assert.equal(await t.page.locator('.amb-avviso').count(), 0);
+    assert.equal(await t.page.evaluate(() => document.documentElement.dataset.amb), 'prod');
+    await t.page.evaluate(() => { ST.cfg.repo = 'visibilita-dati-stage'; render(); });
+    await t.page.waitForSelector('.amb-avviso');
+    assert.match(await t.page.locator('.amb-avviso').innerText(), /dati di prova/);
   } finally { await t.chiudi(); }
 });
 

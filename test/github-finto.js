@@ -6,7 +6,7 @@ const crypto = require('node:crypto');
 const sha1 = (buf) => crypto.createHash('sha1').update(buf).digest('hex');
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*' };
 
-function creaGithub({ owner = 'prova', repo = 'visibilita-dati-stage' } = {}) {
+function creaGithub({ owner = 'prova', repo = 'visibilita-dati' } = {}) {
   const file = new Map();   // percorso → { buf, sha }
   const gh = {
     owner, repo, richieste: [], put: [], rifiuti: 0, offline: false, forza409: 0, ritardoMs: 0,

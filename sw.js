@@ -1,5 +1,5 @@
 // Cache dell'app per l'uso offline. I dati (api.github.com) non passano mai da qui.
-const CACHE = 'vl-0.21.0';
+const CACHE = 'vl-0.22.0';
 const FILE = ['./', 'index.html', 'stile.css', 'app.js', 'logica.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'motore/fonts/PlexSans-Regular.ttf', 'motore/fonts/PlexSans-Medium.ttf', 'motore/fonts/PlexSans-SemiBold.ttf', 'motore/fonts/PlexCond-Bold.ttf', 'motore/fonts/PlexMono-Medium.ttf'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILE))); self.skipWaiting(); });
