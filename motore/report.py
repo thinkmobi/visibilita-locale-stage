@@ -48,9 +48,9 @@ def color(r):
 
 
 def pct_color(p):
-    """quota di punti: verde se la zona è coperta, giallo a metà, arancio se scoperta"""
-    if p >= 50: return C_TOP
-    if p >= 25: return C_MID
+    """quota di punti tra i primi 3: verde dal 66%, giallo dal 33%, rosso sotto (come L.colorePct)"""
+    if p >= 66: return C_TOP
+    if p >= 33: return C_MID
     return C_LOW
 
 

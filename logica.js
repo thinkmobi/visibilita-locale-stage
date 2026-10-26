@@ -68,7 +68,8 @@
 
   /* percentuali mostrate: X,5 per difetto, oltre X,5 per eccesso (regola di Hector, 26/10/2026) */
   L.pct = (n, N) => (N ? Math.max(0, Math.ceil(n / N * 100 - 0.5 - 1e-9)) : 0);
-  L.colorePct = (x) => (x >= 50 ? 'top' : x >= 25 ? 'mid' : 'low');
+  /* colore di una quota di zone tra i primi 3: verde dal 66%, giallo dal 33%, rosso sotto (regola di Hector, 26/10/2026) */
+  L.colorePct = (x) => (x >= 66 ? 'top' : x >= 33 ? 'mid' : 'low');
   L.recStr = (a) => `${a.rv ?? 0} rec. · ${L.virgola(a.r)}`;
   L.nomeBreve = (z, pid) => { const a = z.attivita[pid] || {}; return a.b || a.n || ''; };
   L.indirizzoBreve = (ind, citta) => {

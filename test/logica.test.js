@@ -134,7 +134,7 @@ test('analisi: titolo e testo modificati a mano prevalgono sulla bozza', () => {
 });
 
 test('colorePct, recStr, indirizzoBreve', () => {
-  assert.equal(L.colorePct(50), 'top'); assert.equal(L.colorePct(25), 'mid'); assert.equal(L.colorePct(24), 'low');
+  assert.equal(L.colorePct(66), 'top'); assert.equal(L.colorePct(65), 'mid'); assert.equal(L.colorePct(33), 'mid'); assert.equal(L.colorePct(32), 'low');
   assert.equal(L.recStr({ rv: 32, r: 4.6 }), '32 rec. · 4,6');
   assert.equal(L.recStr({}), '0 rec. · ');
   assert.equal(L.indirizzoBreve('Via Roma, 10, 10100 Torino TO', 'Torino'), 'Via Roma 10, Torino');
