@@ -244,6 +244,25 @@ test('8c. un contatto con data passata registrato dal giro non segna la tappa co
   } finally { await t.chiudi(); }
 });
 
+test('8d. elenco attività della zona: indicatori dei prospect (priorità, top 3, zone al 4°-10° posto, stato, giro) e «+ Giro»', async () => {
+  const t = await apri({ vista: 'zone' });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    await t.page.evaluate((id) => { location.hash = '#z/' + id; }, ID);
+    await t.page.waitForSelector('.zprospect');
+    const testo = await t.page.locator('.foglio').innerText();
+    assert.doesNotMatch(testo, /top 20|Presenza/, 'niente dati sulle prime 20 posizioni');
+    assert.match(testo, /Giro \d{2}\/\d{2} · tappa 1/);
+    assert.match(testo, /4°-10° posto/);
+    const btn = t.page.locator('[data-zgiro="p4"]');
+    assert.equal(await btn.count(), 1, 'RE/MAX Delta fuori dal giro: atteso il pulsante «+ Giro»');
+    await btn.click();
+    await t.page.waitForFunction(() => !document.querySelector('[data-zgiro="p4"]'));
+    await t.page.waitForFunction(() => /^Salvato/.test(document.querySelector('#syncTxt').textContent), null, { timeout: 15000 });
+    assert.equal(t.gh.json(`zone/${ID}/zona.json`).prospect.p4.giro.data, OGGI);
+  } finally { await t.chiudi(); }
+});
+
 test('9. regole di interfaccia: etichette di stato, posizioni in cifre, «rivendicata» solo da c/cv, priorità', async () => {
   const t = await apri({ vista: 'giro' });
   try {

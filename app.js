@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.28.1';
+const VERSIONE = '0.28.2';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -1026,10 +1026,30 @@ function vZone() {
     <div class="sub">«${esc(z.meta.keyword)}» · ${z.punti ? z.punti.length : 0} punti · ${Object.keys(z.attivita || {}).length} attività · ${np} prospect</div>${np ? lavoroZona(z) : ''}</a>`; }).join('') || '<div class="vuoto">Nessuna zona.</div>'}</div>
   <div id="richieste"></div>`;
 }
+/* riga dell'elenco «Attività trovate»: per chi è già prospect mostra gli indicatori per decidere se metterlo in un giro */
+function rigaAttivita(zid, z, pid, a, m, p) {
+  const pc = (n) => L.pct(n, m.N);
+  const ai = L.metricheAI(z, pid);
+  const vicine = m.ranks.filter((r) => r && r >= 4 && r <= 10).length;   // zone al 4°-10° posto: le più facili da portare tra le prime 3
+  const sito = (() => { const si = sitoInfo(z, { pid, sito: '' }); return si.k === 'ok' ? ' · ' + esc(si.label) : ' · <b class="c-mid">' + esc(si.label.toLowerCase()) + '</b>'; })();
+  const base = `Maps ${m.top3}/${m.N} top 3 (${pc(m.top3)}%)${ai ? ` · AI Mode ${ai.top3}/${ai.N} (${L.pct(ai.top3, ai.N)}%)` : ''} · ${a.rv || 0} rec. ${L.virgola(a.r)}`;
+  const nr = a.c === false && a.cv ? ' · <b class="c-neg">non rivendicata</b>' : '';
+  if (!p) return `<div class="card"><div class="riga"><span class="nome">${esc(a.n)}</span><button class="btn mini" data-nuovo="${pid}">+ Prospect</button></div>
+    <div class="sub">${base}${nr}${sito}${RETI.test(a.n) ? ' · rete' : ''}</div></div>`;
+  const ult = registro(zid, p.id)[0];
+  const giro = p.giro && p.giro.data
+    ? `<span class="stato-tappa ${p.giro.fatto ? 'consegnata' : 'rc'}">${p.giro.fatto ? '✓ Consegnato' : 'Giro ' + gg(p.giro.data) + ' · tappa ' + (p.giro.ordine || '—')}</span>`
+    : (aperto(p) ? `<button class="btn mini" data-zgiro="${esc(p.id)}">+ Giro ${gg(dataGiroProposta())}</button>` : '');
+  return `<div class="card zprospect"><div class="riga"><a class="nome" href="#p/${zid}/${p.id}">${esc(p.nome || a.n)}</a><span class="pill p${(p.priorita || '9')[0]}">${prioHtml(p.priorita)}</span></div>
+    <div class="sub">${base}${nr}${sito}</div>
+    <div class="sub">${vicine ? `<b>${vicine} zone al 4°-10° posto</b>: a un passo dalle prime 3` : 'Nessuna zona al 4°-10° posto'}</div>
+    <div class="riga mt" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><span class="sub">${esc(p.stato)}${ult ? ` · ultimo contatto ${gg(ult.data)}: ${esc(ult.esito || ult.canale)}` : ' · mai contattato'}</span>${giro}</div></div>`;
+}
 function apriZona(zid) {
   const s = ST.zone[zid]; if (!s) { location.hash = '#zone'; return; }
   const z = s.z; const giaP = new Set(Object.values(z.prospect || {}).filter((p) => !p.del).map((p) => p.pid));
-  const ord = ST.f.ordZ || 'top20';
+  const prosDi = {}; Object.values(z.prospect || {}).filter((p) => !p.del).forEach((p) => { prosDi[p.pid] = p; });
+  const ord = ST.f.ordZ && ST.f.ordZ !== 'top20' ? ST.f.ordZ : 'top3';   // solo le prime 3 posizioni contano: niente ordinamento per presenza
   const righe = Object.entries(z.attivita || {}).map(([pid, a]) => ({ pid, a, m: L.metriche(z, pid) }))
     .filter((r) => !ST.f.soloNuove || !giaP.has(r.pid))
     .sort((x, y) => ord === 'rv' ? (y.a.rv || 0) - (x.a.rv || 0) : ord === 'nome' ? x.a.n.localeCompare(y.a.n) : (y.m[ord] - x.m[ord]) || ((y.a.rv || 0) - (x.a.rv || 0)));
@@ -1038,14 +1058,17 @@ function apriZona(zid) {
   <div class="sub mt">${s.siti && s.siti.aggiornato ? `Siti controllati il ${oraRoma(s.siti.aggiornato, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${Object.values(s.siti.siti).filter((v) => STATO_SITO[v.stato]).length} non funzionanti su ${Object.keys(s.siti.siti).length}` : 'Siti non ancora controllati'}</div>
   <div class="row mt"><button class="btn mini" id="zSiti">Ricontrolla siti</button><button class="btn mini" id="zPdf">Ultimo PDF</button><button class="btn mini" id="zTesti">Testi della zona</button><button class="btn mini" id="zEsporta">Esporta CSV</button><button class="btn mini" id="zAI">${L.haAI(z) ? 'Aggiorna AI Mode' : 'Aggiungi AI Mode'}</button></div>
   <div class="eb">Attività trovate</div>
-  <div class="filtri">${[['top20', 'Presenza'], ['top3', 'Top 3'], ['rv', 'Recensioni'], ['nome', 'Nome']].map(([k, l]) => `<button class="chip ${ord === k ? 'on' : ''}" data-ord="${k}">${l}</button>`).join('')}
+  <div class="filtri">${[['top3', 'Top 3'], ['rv', 'Recensioni'], ['nome', 'Nome']].map(([k, l]) => `<button class="chip ${ord === k ? 'on' : ''}" data-ord="${k}">${l}</button>`).join('')}
   <button class="chip ${ST.f.soloNuove ? 'on' : ''}" id="soloNuove">Solo non in lista</button></div>
-  <div class="lista">${righe.slice(0, 150).map(({ pid, a, m }) => `<div class="card"><div class="riga"><span class="nome">${esc(a.n)}</span>${giaP.has(pid) ? '<span class="pill">in lista</span>' : `<button class="btn mini" data-nuovo="${pid}">+ Prospect</button>`}</div>
-    <div class="sub">${m.top3}/${m.N} top 3 · ${m.top20}/${m.N} top 20 · ${a.rv || 0} rec. ${L.virgola(a.r)}${a.c === false && a.cv ? ' · <b class="c-neg">non rivendicata</b>' : ''}${(() => { const si = sitoInfo(z, { pid, sito: '' }); return si.k === 'ok' ? ' · ' + esc(si.label) : ' · <b class="c-mid">' + esc(si.label.toLowerCase()) + '</b>'; })()}${RETI.test(a.n) ? ' · rete' : ''}</div></div>`).join('')}</div>`,
+  <div class="lista">${righe.slice(0, 150).map(({ pid, a, m }) => rigaAttivita(zid, z, pid, a, m, prosDi[pid])).join('')}</div>`,
   () => { location.hash = '#zone'; });
   f.querySelectorAll('[data-ord]').forEach((b) => (b.onclick = () => { ST.f.ordZ = b.dataset.ord; apriZona(zid); }));
   $('#soloNuove', f).onclick = () => { ST.f.soloNuove = !ST.f.soloNuove; apriZona(zid); };
   f.querySelectorAll('[data-nuovo]').forEach((b) => (b.onclick = () => nuovoProspect(zid, b.dataset.nuovo)));
+  f.querySelectorAll('[data-zgiro]').forEach((b) => (b.onclick = () => {
+    const id = b.dataset.zgiro, d = dataGiroProposta();
+    aggiorna(zid, id, { giro: { data: d, ordine: prossimoOrdine(zid, d), orario: '', fatto: false } }); toast('Aggiunto al giro del ' + gg(d)); apriZona(zid);
+  }));
   $('#zPdf', f).onclick = async () => {
     const w = window.open('', '_blank'); if (w) w.document.write('<p style="font:16px system-ui;padding:24px">Cerco l\'ultimo PDF…</p>');
     try { const e = await GH.getJSON(`zone/${zid}/stampa/esito.json`); if (e && e.data.file) apriPdf(zid, e.data.file, w); else { if (w) w.close(); toast('Nessun PDF ancora'); } } catch (e) { if (w) w.close(); toast(e.message); }
