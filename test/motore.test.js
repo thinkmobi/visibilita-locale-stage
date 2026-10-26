@@ -73,28 +73,28 @@ test('report.py senza griglia: esce con errore chiaro e non produce PDF', () => 
 /* fogli da lasciare: griglia AI Mode di prova (inventata) sulla stessa griglia della fixture */
 function puntiAI(z) { return z.punti.map(([la, lo, ids]) => [la, lo, [...ids].reverse().slice(0, 3)]); }
 
-test('report.py genera i fogli da lasciare: A4 orizzontale, una pagina per attività', () => {
+test('report.py genera i fogli da lasciare: A4 verticale, due attività per pagina', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vl-fogli-'));
   const dir = path.join(tmp, 'zone', ID); fs.mkdirSync(dir, { recursive: true });
   try {
     const z = zona('2026-10-23'); z.punti_ai = puntiAI(z);
     fs.writeFileSync(path.join(dir, 'zona.json'), JSON.stringify(z));
-    const job = L.jobFogli(z, [z.prospect.p1, z.prospect.p2], { data: '2026-10-24', richiesta: 'fogli-prova' });
+    const job = L.jobFogli(z, [z.prospect.p1, z.prospect.p2, z.prospect.p3], { data: '2026-10-24', richiesta: 'fogli-prova' });
     fs.writeFileSync(path.join(dir, 'stampa.json'), JSON.stringify(job));
     const r = esegui(PY, ['-I', path.join(RADICE, 'motore', 'report.py'), path.join(dir, 'stampa.json')], { cwd: tmp });
     assert.equal(r.status, 0, `report.py exit ${r.status}\n${r.stderr}\n${r.stdout}`);
     const buf = fs.readFileSync(path.join(dir, 'stampa', job.file + '.pdf'));
     assert.equal(buf.subarray(0, 5).toString(), '%PDF-');
     const pagine = (buf.toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) || []).length;
-    assert.equal(pagine, 2);
-    assert.match(buf.toString('latin1'), /MediaBox \[\s*0 0 841\.8898 595\.2756\s*\]/, 'la pagina non è A4 orizzontale');
+    assert.equal(pagine, 2, '3 attività: 2 pagine (2 + 1)');
+    assert.match(buf.toString('latin1'), /MediaBox \[\s*0 0 595\.2756 841\.8898\s*\]/, 'la pagina non è A4 verticale');
     const esito = JSON.parse(fs.readFileSync(path.join(dir, 'stampa', 'esito.json'), 'utf8'));
     assert.equal(esito.tipo, 'fogli'); assert.equal(esito.richiesta, 'fogli-prova');
     assert.deepEqual(esito.avvisi, [], 'avvisi inattesi: ' + esito.avvisi);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 });
 
-test('report.py fogli senza AI Mode: un foglio per attività con la sola mappa Google Maps', () => {
+test('report.py fogli senza AI Mode: due attività per pagina con la sola mappa Google Maps', () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vl-fogli-'));
   const dir = path.join(tmp, 'zone', ID); fs.mkdirSync(dir, { recursive: true });
   try {
@@ -105,7 +105,7 @@ test('report.py fogli senza AI Mode: un foglio per attività con la sola mappa G
     assert.equal(r.status, 0, `report.py exit ${r.status}\n${r.stderr}\n${r.stdout}`);
     const buf = fs.readFileSync(path.join(dir, 'stampa', job.file + '.pdf'));
     const pagine = (buf.toString('latin1').match(/\/Type\s*\/Page(?![s\w])/g) || []).length;
-    assert.equal(pagine, 2);
+    assert.equal(pagine, 1, '2 attività: una sola pagina');
     const esito = JSON.parse(fs.readFileSync(path.join(dir, 'stampa', 'esito.json'), 'utf8'));
     assert.deepEqual(esito.avvisi, []);
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
