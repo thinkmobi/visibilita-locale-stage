@@ -253,3 +253,9 @@ html.avvio,html.avvio body{background:#1F1E1B}
 /* giri passati con tappe ancora da fare: arancione chiaro della palette */
 .date-giro .chip.arretrato{border-color:#F29529;background:#FEF4E8}
 .date-giro .chip.arretrato.on{border-color:var(--ink);background:var(--ink)}
+
+/* lista Zone: cosa resta da fare in ogni zona */
+.lavoro-zona{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}.lavoro-zona .stato-tappa{margin:0;white-space:nowrap}.lavoro-zona .sub{font-size:12px}
+/* iOS 26: sotto la barra di stato compariva una sfumatura (bordo di scorrimento). Una striscia fissa e piena
+   che tocca il bordo alto fa tingere a iOS la barra di stato di bianco pieno, come la testata */
+body::before{content:"";position:fixed;top:0;left:0;right:0;height:calc(env(safe-area-inset-top,0px) + 1px);background:#fff;z-index:6;pointer-events:none}

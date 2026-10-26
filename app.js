@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.20.3';
+const VERSIONE = '0.21.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 { const sv = document.getElementById('splashV'); if (sv) sv.textContent = 'Versione ' + VERSIONE; }
 const STATI = ['Da contattare', 'Contattato', 'In attesa di risposta', 'Visita fissata', 'Visita fatta', 'Proposta inviata', 'Trattativa', 'Vinto', 'Perso', 'Scartato'];
@@ -949,12 +949,39 @@ async function apriPdf(zid, file, w0) {
 }
 
 /* ---------- vista: zone ---------- */
+// cosa resta da fare in una zona: tappe da visitare e da ripassare, richiami scaduti o di oggi, prospect mai contattati,
+// report completi da preparare, prossima data di giro; consegnati in coda. I non interessati e i chiusi non contano
+function lavoroZona(z) {
+  const og = oggi();
+  const tutti = Object.values(z.prospect || {}).filter((p) => !p.del);
+  const ap = tutti.filter((p) => aperto(p) && !nonInteressato(z, p));
+  const rip = ap.filter((p) => ripassare(z, p));
+  const vis = ap.filter((p) => p.giro && p.giro.data && !p.giro.fatto && p.giro.data >= og && !ripassare(z, p));
+  // chi è già nel giro o da ripassare si conta lì, non tra i richiami
+  const ric = ap.filter((p) => { const g = urgenza(p); return g !== null && g <= 0 && !vis.includes(p) && !rip.includes(p); });
+  const scad = ric.filter((p) => urgenza(p) < 0).length;
+  const nuovi = ap.filter((p) => p.stato === 'Da contattare' && !p.giro && !ultimoReg(z, p.id) && !p.data_prossima);
+  const rc = ap.filter((p) => reportCompleto(z, p));
+  const cons = tutti.filter((p) => p.giro && p.giro.fatto).length;
+  const prox = ap.filter((p) => p.giro && p.giro.data && !p.giro.fatto && p.giro.data >= og).map((p) => p.giro.data).sort()[0];
+  const pill = (cl, t) => `<span class="stato-tappa ${cl}">${t}</span>`;
+  const out = [];
+  if (vis.length) out.push(pill('', `${vis.length} da visitare`));
+  if (rip.length) out.push(pill('ripassare', `↻ ${rip.length} da ripassare`));
+  if (ric.length) out.push(pill(scad ? 'ni' : 'ripassare', `${ric.length} da richiamare${scad ? ` (${scad} in ritardo)` : ''}`));
+  if (rc.length) out.push(pill('rc', `${rc.length} report completo`));
+  if (nuovi.length) out.push(pill('visitata', `${nuovi.length} mai ${nuovi.length === 1 ? 'contattato' : 'contattati'}`));
+  if (!out.length) out.push(pill('', 'Niente in sospeso'));
+  if (cons) out.push(pill('consegnata', `✓ ${cons} ${cons === 1 ? 'consegnato' : 'consegnati'}`));
+  const giro = prox ? `<span class="sub">${prox === og ? 'Giro oggi' : 'Prossimo giro ' + gg(prox)}</span>` : '';
+  return `<div class="lavoro-zona">${out.join('')}${giro}</div>`;
+}
 function vZone() {
   const ids = Object.keys(ST.zone).sort().reverse();
   return `<div class="row"><button class="btn pri" id="nuovaScan">Nuova zona da Local Falcon</button><label class="btn">Importa file zona<input type="file" id="impZona" accept=".json,.png" multiple hidden></label></div>
   <div class="lista mt">${ids.map((id) => { const z = ST.zone[id].z; const np = Object.values(z.prospect || {}).filter((p) => !p.del).length;
     return `<a class="card" href="#z/${id}"><div class="riga"><span class="nome">${esc(z.meta.quartiere)}, ${esc(z.meta.citta)}</span><span class="data">${gg(z.meta.data)}</span></div>
-    <div class="sub">«${esc(z.meta.keyword)}» · ${z.punti ? z.punti.length : 0} punti · ${Object.keys(z.attivita || {}).length} attività · ${np} prospect</div></a>`; }).join('') || '<div class="vuoto">Nessuna zona.</div>'}</div>
+    <div class="sub">«${esc(z.meta.keyword)}» · ${z.punti ? z.punti.length : 0} punti · ${Object.keys(z.attivita || {}).length} attività · ${np} prospect</div>${np ? lavoroZona(z) : ''}</a>`; }).join('') || '<div class="vuoto">Nessuna zona.</div>'}</div>
   <div id="richieste"></div>`;
 }
 function apriZona(zid) {
