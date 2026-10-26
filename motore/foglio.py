@@ -77,6 +77,16 @@ def presenza(dentro, N, chi):
     return (pc(dentro, N), testo, "Finché la situazione resta questa, quelle ricerche vanno agli altri.")
 
 
+def presenza_doppia(b, a, N):
+    """riquadro rosa con AI Mode e Maps: le due quote di zone tra i primi 3, nello stesso ordine delle mappe"""
+    fuori = (b < N) or (a < N)
+    testo = "delle zone in cui Google vi mostra tra i primi 3 risultati."
+    if fuori:
+        testo += (" Nelle altre" if (a or b) else " Ovunque") + " chi cerca vede prima i vostri concorrenti e chiama loro."
+    return {"voci": [(pc(b, N), "Google AI Mode"), (pc(a, N), "Google Maps")], "testo": testo,
+            "chiusa": "Finché la situazione resta questa, quelle ricerche vanno agli altri." if fuori else ""}
+
+
 def testi(job, f, mm_, ma, debole):
     """testi del foglio: generati dai numeri e dalla frase della zona, uguali per ogni settore.
     debole = "ai" o "maps": il titolo parla della piattaforma in cui l'attività è più indietro"""
@@ -110,7 +120,7 @@ def testi(job, f, mm_, ma, debole):
     sub = f"Tra i primi 3: su Google AI Mode in {b} zone su {N} ({pc(b, N)}), su Google Maps in {a} ({pc(a, N)})."
     lettura = "Ogni pallino è una zona: il numero è la vostra posizione su Google da quel punto. Il quadratino nero è la vostra sede."
     # quota di zone tra i primi 3 sulla piattaforma debole: si vede subito quanto poco compare
-    rischio = presenza(dentro, N, "Google AI Mode" if debole == "ai" else "Google Maps")
+    rischio = presenza_doppia(b, a, N)
     invito = ("Prossimo passo", "Vi mostro l’analisi completa",
               "In un incontro guardiamo zona per zona chi vi passa davanti e parliamo delle azioni correttive per migliorare il vostro posizionamento nel tempo.")
     return {"titolo": titolo, "sub": sub, "lettura": lettura, "rischio": rischio, "fuori": fuori, "invito": invito, "dove": dove}
@@ -255,20 +265,30 @@ def pagina(c, job, f, bg, firma):
         mappa(c, xm, my, S1, punti, rkm, bg, sede)
         numeri(xm + S1 + 6 * mm, my + S1 / 2, rkm, mm_)
     sx = xm + 2 * S + gap + gcol; sw = W - MR - sx
-    # riquadro rosa: quanto vi vede chi cerca (presenza tra i primi 3 sulla piattaforma debole)
-    big, rt, chiusa = T["rischio"]
+    # riquadro rosa: quanto vi vede chi cerca (presenza tra i primi 3: AI Mode e Maps, oppure solo Maps)
+    doppio = isinstance(T["rischio"], dict)
+    if doppio: voci, rt, chiusa = T["rischio"]["voci"], T["rischio"]["testo"], T["rischio"]["chiusa"]
+    else: big, rt, chiusa = T["rischio"]
     inner = sw - 9 * mm
     p1 = P(esc(rt), "P", 10.4, 13.4, NEGTX); _, h1 = p1.wrap(inner, 100 * mm)
     p2 = P(f"<b>{esc(chiusa)}</b>", "P", 9.6, 12.4, NEGTX) if chiusa else None; _, h2 = p2.wrap(inner, 100 * mm) if p2 else (0, -4 * mm)
-    hb = 6 * mm + 4 * mm + 15 * mm + h1 + 4 * mm + h2 + 5 * mm
+    hb = 6 * mm + 4 * mm + (19 if doppio else 15) * mm + h1 + 4 * mm + h2 + 5 * mm
     yb = y - hb
     c.setFillColor(NEGBG); c.roundRect(sx, yb, sw, hb, 1.6 * mm, stroke=0, fill=1)
     c.setFillColor(NEGBR); c.rect(sx, yb, 1.3 * mm, hb, stroke=0, fill=1)
     ix = sx + 5.5 * mm; iy = y - 6 * mm
     spaced(c, ix, iy - 1 * mm, "Quanto vi vede chi cerca", "MOB", 8.4, NEGTX, .12)
-    iy -= 4 * mm + 13 * mm
-    c.setFillColor(NEGBR); c.setFont("C", 40); c.drawString(ix, iy, str(big))
-    iy -= 4 * mm
+    if doppio:
+        # due numeri affiancati, con la piattaforma sotto: prima AI Mode, poi Maps, come le mappe
+        iy -= 4 * mm + 11 * mm; cw = inner / 2
+        for k, (val, lab) in enumerate(voci):
+            c.setFillColor(NEGBR); c.setFont("C", 32); c.drawString(ix + k * cw, iy, str(val))
+            spaced(c, ix + k * cw, iy - 4.6 * mm, lab, "MOB", 7, NEGTX, .1)
+        iy -= 8.6 * mm
+    else:
+        iy -= 4 * mm + 13 * mm
+        c.setFillColor(NEGBR); c.setFont("C", 40); c.drawString(ix, iy, str(big))
+        iy -= 4 * mm
     p1.drawOn(c, ix, iy - h1); iy -= h1 + 2 * mm
     if p2:
         c.setStrokeColor(HexColor("#E9B9B4")); c.setLineWidth(.5); c.line(ix, iy, sx + sw - 4 * mm, iy); iy -= 2 * mm
