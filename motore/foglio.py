@@ -300,7 +300,7 @@ def pagina(c, job, f, bg, firma):
     ix = sx + 5.5 * mm; iy = y - 6 * mm
     spaced(c, ix, iy - 1 * mm, "Quanto vi vede chi cerca", "MOB", 8.4, NEGTX, .12)
     if doppio:
-        # due numeri affiancati, con la piattaforma sotto: prima AI Mode, poi Maps, come le mappe
+        # due numeri affiancati, prima AI Mode e poi Maps come le mappe
         iy -= 4 * mm + 11 * mm; cw = inner / 2
         for k, (val, lab) in enumerate(voci):
             # simbolo e nome sopra il numero, come le testate delle mappe
