@@ -141,14 +141,14 @@ test('colorePct, recStr, indirizzoBreve', () => {
   assert.equal(L.indirizzoBreve('', 'Torino'), 'Torino');
 });
 
-test('nomeFile: data AAMMGG, categoria, quartiere senza spazi', () => {
-  assert.equal(L.nomeFile(z, '2026-10-23'), '261023-Agenzia immobiliare-Crocetta');
+test('nomeFile: data AAMMGG, categoria e quartiere senza spazi', () => {
+  assert.equal(L.nomeFile(z, '2026-10-23'), '261023-AgenziaImmobiliare-Crocetta');
 });
 
 test('jobStampa: struttura attesa da motore/report.py', () => {
   const job = L.jobStampa(z, [P.p1, P.p2], { data: '2026-10-23', richiesta: 'r1' });
   assert.equal(job.richiesta, 'r1');
-  assert.equal(job.file, '261023-Agenzia immobiliare-Crocetta');
+  assert.equal(job.file, '261023-AgenziaImmobiliare-Crocetta');
   assert.equal(job.punti.length, 9);
   assert.equal(job.analisi.length, 2);
   assert.equal(job.lat_centro, 45.06);
