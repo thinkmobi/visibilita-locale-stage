@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.29.3';
+const VERSIONE = '0.29.4';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -1332,6 +1332,7 @@ function vAltro() {
   <div class="eb">Dati</div>
   <div class="row"><button class="btn" id="bkp">Scarica backup completo</button><button class="btn" id="csvAll">Esporta CSV (Excel)</button><button class="btn" id="aggiorna">Riscarica da GitHub</button></div>
   <p class="sub mt"><span class="amb amb-${AMBIENTE}">${AMB_NOME}</span> Versione v${VERSIONE} · dati ${esc((c.owner || '…') + '/' + (c.repo || '…'))}. I dati restano nel repository privato e in questo dispositivo; il token è salvato solo qui. Su un telefono perso: revoca il token da GitHub → Settings → Developer settings.</p>
+  ${AMBIENTE === 'stage' ? `<p class="sub mt mono" id="diagFin">${esc(diagFinestra())}</p>` : ''}
   <button class="btn mini" id="esci" style="color:var(--neg)">Scollega e cancella i dati da questo dispositivo</button>`;
 }
 async function preparaRepo(out) {
@@ -1463,15 +1464,28 @@ function legaVista(v) {
 // Rimedio: 1) altezza del corpo pagina presa dallo schermo, che in modalità app occupa tutto; 2) un "ricalcolo" forzato
 // (nascondi e rimostra il corpo) quando l'app torna in primo piano o si chiude la tastiera.
 const IPHONE_APP = /iPhone/.test(navigator.userAgent) && navigator.standalone === true;
+/* margine di sicurezza in alto: > 0 solo se la pagina parte da sotto la barra di stato (finestra a tutto schermo) */
+function margineAlto() {
+  const p = document.createElement('div'); p.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px)';
+  document.body.appendChild(p); const v = parseFloat(getComputedStyle(p).paddingTop) || 0; p.remove(); return v;
+}
 function altezzaGiusta() {
   const h = window.innerHeight;
   if (!IPHONE_APP) return h;
+  // in verticale con la barra di stato «default» la finestra parte SOTTO la barra di stato (margine alto 0):
+  // lì innerHeight più corto dello schermo è giusto, e allungare il corpo spinge la barra delle schede fuori dallo schermo
+  if (window.innerWidth <= h && margineAlto() === 0) return h;
   const orizz = window.innerWidth > h;
   const schermo = orizz ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
   const att = document.activeElement;
   const tastiera = att && /^(INPUT|TEXTAREA|SELECT)$/.test(att.tagName);
   // solo uno scarto "da bug" (fino a ~140 px) e senza tastiera aperta; oltre è la tastiera o altro, si lascia fare a iOS
   return !tastiera && schermo > h && schermo - h <= 140 ? schermo : h;
+}
+/* diagnostica della finestra (solo stage): serve a capire problemi di altezza su iPhone dagli screenshot */
+function diagFinestra() {
+  const t = document.querySelector('.tab'); const tb = t ? Math.round(t.getBoundingClientRect().bottom) : '?';
+  return `finestra ${innerWidth}×${innerHeight} · schermo ${screen.width}×${screen.height} · margine alto ${margineAlto()} · corpo ${Math.round(document.body.getBoundingClientRect().height)} · fondo barra ${tb} · app ${IPHONE_APP ? 'sì' : 'no'}`;
 }
 function adattaAltezza() {
   const b = document.body; if (!b) return;
