@@ -263,6 +263,20 @@ test('8d. elenco attività della zona: indicatori dei prospect (priorità, top 3
   } finally { await t.chiudi(); }
 });
 
+test('8e. liste: barre del posizionamento con la quota di zone tra i primi 3 (Maps; AI Mode sopra quando c’è)', async () => {
+  const t = await apri({ vista: 'prospect' });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    const card = t.page.locator(`a.card[href="#p/${ID}/p1"]`);
+    await card.waitFor();
+    const testo = await card.locator('.pos').innerText();
+    assert.match(testo, /MAPS\s*\d+%/i);
+    assert.doesNotMatch(testo, /top 20|presente/i);
+    const w = await card.locator('.pos-t i').first().evaluate((e) => e.style.width);
+    assert.match(w, /^\d+%$/);
+  } finally { await t.chiudi(); }
+});
+
 test('9. regole di interfaccia: etichette di stato, posizioni in cifre, «rivendicata» solo da c/cv, priorità', async () => {
   const t = await apri({ vista: 'giro' });
   try {

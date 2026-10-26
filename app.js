@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.28.3';
+const VERSIONE = '0.29.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -403,6 +403,15 @@ const inLavoro = (x) => !nonInteressato(x.z, x.p);
 const ripassare = (z, p) => { if ((p.giro && p.giro.fatto) || !aperto(p)) return false; const r = ultimoReg(z, p.id); return (r && esitiDi(r).some((e) => e === 'Chiuso' || e === 'Ripassare')) || /^ripassare/i.test(p.prossima || ''); };
 const badgeRC = (z, p) => (reportCompleto(z, p) && !/report completo/i.test(p.prossima || '') ? '<span class="badge-rc">Report completo da preparare</span>' : '');
 const esitoBreve = (r) => esitiDi(r).map((e) => esc(e)).join(' · ');
+/* posizionamento nelle liste: quota di zone tra i primi 3, AI Mode (piattaforma primaria) sopra Maps, con barre */
+function posizionamento(z, p) {
+  if (!p.pid || !z.attivita || !z.attivita[p.pid] || !z.punti || !z.punti.length) return '';
+  const m = L.metriche(z, p.pid);
+  const ai = L.metricheAI(z, p.pid);
+  const voci = [ai ? ['AI Mode', L.pct(ai.top3, ai.N)] : null, ['Maps', L.pct(m.top3, m.N)]].filter(Boolean);
+  return `<div class="pos" aria-label="Zone tra i primi 3">${voci.map(([l, v]) => { const c = L.colorePct(v);
+    return `<div class="pos-r"><span class="pos-l">${l}</span><span class="pos-t"><i class="pos-${c}" style="width:${Math.max(v, 2)}%"></i></span><b class="c-${c}">${v}%</b></div>`; }).join('')}</div>`;
+}
 function testoProspect(z, p, extra = '', opz = {}) {
   const g = urgenza(p); const ur = ultimoReg(z, p.id);
   const quando = p.data_prossima ? (g < 0 ? `<span class="data c-neg">scaduta ${gg(p.data_prossima)}</span>` : g === 0 ? '<span class="data c-low">oggi</span>' : `<span class="data">${gg(p.data_prossima)}</span>`) : '';
@@ -410,6 +419,7 @@ function testoProspect(z, p, extra = '', opz = {}) {
     <div class="riga"><span class="sub">${esc(p.stato)} · ${esc(z.meta.quartiere)}</span><span class="pill ${prioClasse(p)}">${prioHtml(p.priorita)}</span></div>
     ${ur ? `<div class="ultimo"><span>Ultimo contatto</span> <b>${esitoBreve(ur)}</b> · ${gg(ur.data)}</div>` : ''}
     ${p.prossima ? `<div class="az">→ ${esc(p.prossima)}</div>` : aperto(p) ? '<div class="az c-low">Nessuna prossima azione</div>' : ''}
+    ${posizionamento(z, p)}
     <div class="badges">${opz.senzaRC ? '' : badgeRC(z, p)}${badgeSito(z, p)}${badgePG(p)}${nonRiv(z, p) ? '<span class="badge-nr"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg>Scheda non rivendicata</span>' : ''}</div>${extra}`;
 }
 function cardProspect({ zid, z, p }, extra = '') {

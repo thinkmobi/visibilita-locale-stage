@@ -273,3 +273,11 @@ html[data-amb="stage"] .amb-top{display:inline-block}
 /* stage: bordo arancione sotto la testata, si vede in ogni schermata */
 html[data-amb="stage"] .top{border-bottom:3px solid #F29529}
 .amb-avviso{margin:0 0 12px;padding:10px 12px;background:#FCE8E6;color:#C5221F;border:1px solid #E8603C;border-radius:var(--r);font-size:13px;line-height:1.4}
+
+/* posizionamento nelle liste: barre AI Mode e Maps (quota di zone tra i primi 3) */
+.pos{margin-top:7px;display:grid;gap:4px}
+.pos-r{display:grid;grid-template-columns:62px 1fr 38px;align-items:center;gap:8px}
+.pos-l{font-family:PlexMono;text-transform:uppercase;font-size:10.5px;color:var(--mute)}
+.pos-t{height:7px;border-radius:4px;background:#E6E9E7;overflow:hidden}.pos-t i{display:block;height:100%;border-radius:4px}
+.pos-t i.pos-top{background:var(--g2)}.pos-t i.pos-mid{background:var(--y)}.pos-t i.pos-low{background:var(--r1)}
+.pos-r b{font-family:PlexCond;font-size:14px;text-align:right}
