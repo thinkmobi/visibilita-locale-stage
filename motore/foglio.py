@@ -232,7 +232,7 @@ def pagina(c, job, f, bg, firma):
     # --- due mappe a sinistra, colonna dei messaggi a destra
     gap, gcol = 7 * mm, 8.5 * mm
     avail = y - bottom
-    head_h, stat_h = 9.5 * mm, 19 * mm
+    head_h, stat_h = 12 * mm, 19 * mm
     S = min(80 * mm, avail - head_h - stat_h)
     xm = ML
     sede = (f.get("lat"), f.get("lng"))
@@ -243,9 +243,20 @@ def pagina(c, job, f, bg, firma):
         # etichetta sopra il numero, come nella scheda dell'app
         c.setFillColor(MUTE); c.setFont("P", 9.6); c.drawString(tx, cy + 2.6 * mm, "tra i primi 3 risultati")
         c.setFillColor(INK); c.setFont("C", 20); c.drawString(tx, cy - 4.6 * mm, f"{m['top3']} {'zona' if m['top3'] == 1 else 'zone'} su {m['N']}")
+    def icona(lab, x, yb, h, col):
+        """simbolo della piattaforma: scintilla per AI Mode, segnaposto per Maps (riconoscibili anche in bianco e nero)"""
+        c.setFillColor(col)
+        if "AI" in lab:
+            c.setFont("DJ", h * 1.25); c.drawString(x, yb, "✦"); return h * 1.05
+        r = h * .36; cx = x + r; cy = yb + h * .62
+        pth = c.beginPath(); pth.moveTo(cx - r * .82, cy - r * .55); pth.lineTo(cx, yb - h * .05); pth.lineTo(cx + r * .82, cy - r * .55); pth.close()
+        c.drawPath(pth, stroke=0, fill=1); c.circle(cx, cy, r, stroke=0, fill=1)
+        c.setFillColor(white); c.circle(cx, cy, r * .42, stroke=0, fill=1); return 2 * r + h * .2
     def testata(x, lab, sub, w):
-        spaced(c, x, y - 3 * mm, lab, "MOB", 8.6, INK, .1)
-        c.setFillColor(MUTE); c.setFont("P", 8.2); c.drawString(x, y - 7 * mm, sub)
+        # simbolo e nome grande della piattaforma, descrizione sotto
+        dx = icona(lab, x, y - 5.6 * mm, 4.6 * mm, INK)
+        c.setFillColor(INK); c.setFont("C", 16); c.drawString(x + dx + 1.6 * mm, y - 5.4 * mm, lab)
+        c.setFillColor(MUTE); c.setFont("P", 8.2); c.drawString(x, y - 9.6 * mm, sub)
         c.setStrokeColor(LINE); c.setLineWidth(.5); c.line(x, y - head_h + .6 * mm, x + w, y - head_h + .6 * mm)
     if pai:
         for i, (lab, sub, pts, rk, m) in enumerate([
@@ -270,9 +281,9 @@ def pagina(c, job, f, bg, firma):
     if doppio: voci, rt, chiusa = T["rischio"]["voci"], T["rischio"]["testo"], T["rischio"]["chiusa"]
     else: big, rt, chiusa = T["rischio"]
     inner = sw - 9 * mm
-    p1 = P(esc(rt), "P", 10.4, 13.4, NEGTX); _, h1 = p1.wrap(inner, 100 * mm)
+    p1 = P(esc(rt), "P", 9.8 if doppio else 10.4, 12.4 if doppio else 13.4, NEGTX); _, h1 = p1.wrap(inner, 100 * mm)
     p2 = P(f"<b>{esc(chiusa)}</b>", "P", 9.6, 12.4, NEGTX) if chiusa else None; _, h2 = p2.wrap(inner, 100 * mm) if p2 else (0, -4 * mm)
-    hb = 6 * mm + 4 * mm + (19 if doppio else 15) * mm + h1 + 4 * mm + h2 + 5 * mm
+    hb = 6 * mm + 4 * mm + (20.5 if doppio else 15) * mm + h1 + 4 * mm + h2 + 5 * mm
     yb = y - hb
     c.setFillColor(NEGBG); c.roundRect(sx, yb, sw, hb, 1.6 * mm, stroke=0, fill=1)
     c.setFillColor(NEGBR); c.rect(sx, yb, 1.3 * mm, hb, stroke=0, fill=1)
@@ -282,9 +293,12 @@ def pagina(c, job, f, bg, firma):
         # due numeri affiancati, con la piattaforma sotto: prima AI Mode, poi Maps, come le mappe
         iy -= 4 * mm + 11 * mm; cw = inner / 2
         for k, (val, lab) in enumerate(voci):
-            c.setFillColor(NEGBR); c.setFont("C", 32); c.drawString(ix + k * cw, iy, str(val))
-            spaced(c, ix + k * cw, iy - 4.6 * mm, lab, "MOB", 7, NEGTX, .1)
-        iy -= 8.6 * mm
+            # simbolo e nome sopra il numero, come le testate delle mappe
+            xx = ix + k * cw
+            dx = icona(lab, xx, iy + 3.6 * mm, 3.6 * mm, NEGTX)
+            c.setFillColor(NEGTX); c.setFont("C", 12); c.drawString(xx + dx + 1.2 * mm, iy + 3.8 * mm, lab)
+            c.setFillColor(NEGBR); c.setFont("C", 27); c.drawString(xx, iy - 6 * mm, str(val))
+        iy -= 10.5 * mm
     else:
         iy -= 4 * mm + 13 * mm
         c.setFillColor(NEGBR); c.setFont("C", 40); c.drawString(ix, iy, str(big))
