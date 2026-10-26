@@ -90,6 +90,7 @@ label.f textarea{min-height:76px;resize:vertical}
 .stat{display:flex;gap:16px;flex-wrap:wrap}
 .stat div b{font-family:PlexCond;font-size:24px;display:block;line-height:1.1}
 .stat div span{font-size:11px;color:var(--mute);font-family:PlexMono;text-transform:uppercase}
+.stat div b small{font-size:.6em;margin-left:5px}
 table.cl{width:100%;border-collapse:collapse;font-size:13px}
 table.cl td{padding:5px 4px;border-bottom:1px solid var(--line)}
 table.cl tr.me td{background:#EAF1FD;font-weight:600;font-display:swap}

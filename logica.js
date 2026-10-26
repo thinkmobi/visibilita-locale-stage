@@ -66,6 +66,8 @@
     return ord[0];
   };
 
+  /* percentuali mostrate: X,5 per difetto, oltre X,5 per eccesso (regola di Hector, 26/10/2026) */
+  L.pct = (n, N) => (N ? Math.max(0, Math.ceil(n / N * 100 - 0.5 - 1e-9)) : 0);
   L.colorePct = (x) => (x >= 50 ? 'top' : x >= 25 ? 'mid' : 'low');
   L.recStr = (a) => `${a.rv ?? 0} rec. · ${L.virgola(a.r)}`;
   L.nomeBreve = (z, pid) => { const a = z.attivita[pid] || {}; return a.b || a.n || ''; };
@@ -105,7 +107,8 @@
     const lu = luogo(z, p);
     const dv = L.tondo(vicino.d);
     const a_dist = dv < 30 ? lu[2] : `A ${dv} metri ${lu[0]}`;
-    const fuori = m.N - m.top20, pf = Math.round(fuori / m.N * 100);
+    // solo le prime 3 posizioni contano: fuori = punti in cui non è tra le prime 3; l'assenza è 100 meno la presenza arrotondata
+    const fuori = m.N - m.top3, pf = 100 - L.pct(m.top3, m.N);
     const sopra = righe.filter((r) => !r[3] && r[0] && (!pt.rank || r[0] < pt.rank));
     const deboli = sopra.filter((r) => parseInt(r[2], 10) < (a.rv || 0));
     let titolo, cosa;
@@ -116,11 +119,11 @@
     } else if (!vicino.rank || vicino.rank > 3) {
       titolo = vicino.rank ? `${a_dist}, su Google è ${L.alPosto(vicino.rank)}.` : `${a_dist}, su Google non compare.`;
       cosa = (deboli.length ? (deboli.length === 1 ? 'Davanti a Lei compare una concorrente' : `Davanti a Lei compaiono ${deboli.length} concorrenti`) + ` con meno recensioni delle sue ${a.rv}. ` : '') +
-        `In ${fuori} punti su ${m.N} (${pf}%) non compare tra i primi 20 risultati.`;
+        `In ${fuori} punti su ${m.N} (${pf}%) non compare tra le prime 3 posizioni.`;
     } else {
       titolo = `${lu[2]} è ${L.alPosto(vicino.rank)}. A ${L.tondo(pt.d)} metri ` +
         (pt.rank ? `è ${L.alPostoBreve(pt.rank)}.` : 'non compare più.');
-      cosa = `La visibilità si ferma vicino alla sede. In ${fuori} punti su ${m.N} (${pf}%) non compare tra i primi 20 risultati.`;
+      cosa = `La visibilità si ferma vicino alla sede. In ${fuori} punti su ${m.N} (${pf}%) non compare tra le prime 3 posizioni.`;
     }
     return { titolo, cosa };
   };
@@ -130,7 +133,7 @@
     const a = z.attivita[p.pid] || {};
     const r = p.report || {};
     const b = L.bozza(z, p);
-    const pc = (n) => Math.round(n / m.N * 100);
+    const pc = (n) => L.pct(n, m.N);
     const [la, lo] = L.coord(z, p);
     return {
       name: L.nomeBreve(z, p.pid) || p.nome, pid: p.pid, lat: la, lng: lo, date: z.meta.data_testo,
@@ -138,7 +141,6 @@
       subtitle: r.sottotitolo || `${L.nomeBreve(z, p.pid) || p.nome} · ${L.indirizzoBreve(p.indirizzo || a.a, z.meta.citta)}`,
       stats: [
         { big: `${m.top3} su ${m.N}`, pct: pc(m.top3) + '%', lab: 'punti in cui compare tra le prime 3 posizioni', color: L.colorePct(pc(m.top3)) },
-        { big: `${m.top20} su ${m.N}`, pct: pc(m.top20) + '%', lab: 'punti in cui compare tra le prime 20 posizioni', color: L.colorePct(pc(m.top20)) },
         { big: String(a.rv ?? 0), pct: '', lab: `recensioni, media ${L.virgola(a.r)}`, color: 'ink' },
       ],
       list_title: r.titolo_lista || L.titoloLista(z, p),

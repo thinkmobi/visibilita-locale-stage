@@ -31,8 +31,8 @@ def heat(r):
 
 
 def su(n):
-    """numeri mostrati: interi arrotondati al più vicino (0,5 per eccesso)"""
-    return max(0, math.floor(n + .5 + 1e-9))
+    """numeri mostrati: X,5 per difetto, oltre X,5 per eccesso (regola di Hector, 26/10/2026)"""
+    return max(0, math.ceil(n - .5 - 1e-9))
 
 
 def pc(a, b):
@@ -66,6 +66,17 @@ def metriche(rk):
             "arp": (sum(tro) / len(tro)) if tro else None}
 
 
+def presenza(dentro, N, chi):
+    """riquadro rosa: quota di zone in cui compare tra i primi 3 (la presenza, non la perdita), e cosa succede nelle altre.
+    chi = la piattaforma debole come soggetto («Google AI Mode», «Google Maps»)"""
+    fuori = N - dentro
+    testo = f"delle zone in cui {chi} vi mostra tra i primi 3 risultati."
+    if not fuori:
+        return (pc(dentro, N), testo, "")
+    testo += (" Nelle altre" if dentro else " Ovunque") + " chi cerca vede prima i vostri concorrenti e chiama loro."
+    return (pc(dentro, N), testo, "Finché la situazione resta questa, quelle ricerche vanno agli altri.")
+
+
 def testi(job, f, mm_, ma, debole):
     """testi del foglio: generati dai numeri e dalla frase della zona, uguali per ogni settore.
     debole = "ai" o "maps": il titolo parla della piattaforma in cui l'attività è più indietro"""
@@ -81,9 +92,8 @@ def testi(job, f, mm_, ma, debole):
         fuori = N - a
         titolo = (f"Su Google Maps, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti" if fuori
                   else f"Su Google Maps siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>")
-        quota = f"{100 - su(a / N * 100)}%" if N else "0%"
         return {"titolo": titolo, "lettura": lettura, "fuori": fuori, "invito": invito, "dove": "Su Google Maps",
-                "rischio": (quota, "delle zone: chi cerca da lì vede prima i vostri concorrenti e chiama loro.")}
+                "rischio": presenza(a, N, "Google Maps")}
     dentro = b if debole == "ai" else a
     fuori = N - dentro
     altro_fuori = N - (a if debole == "ai" else b)
@@ -99,9 +109,8 @@ def testi(job, f, mm_, ma, debole):
         titolo = f"Su Google Maps e su Google AI Mode siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
     sub = f"Tra i primi 3: su Google Maps in {a} zone su {N} ({pc(a, N)}), su Google AI Mode in {b} ({pc(b, N)})."
     lettura = "Ogni pallino è una zona: il numero è la vostra posizione su Google da quel punto. Il quadratino nero è la vostra sede."
-    # percentuale complementare a quella dell'anello della piattaforma debole: le due sommano sempre 100
-    quota = f"{100 - su(dentro / N * 100)}%" if N else "0%"
-    rischio = (quota, "delle zone: chi cerca da lì vede prima i vostri concorrenti e chiama loro.")
+    # quota di zone tra i primi 3 sulla piattaforma debole: si vede subito quanto poco compare
+    rischio = presenza(dentro, N, "Google AI Mode" if debole == "ai" else "Google Maps")
     invito = ("Prossimo passo", "Vi mostro l’analisi completa",
               "In un incontro guardiamo zona per zona chi vi passa davanti e parliamo delle azioni correttive per migliorare il vostro posizionamento nel tempo.")
     return {"titolo": titolo, "sub": sub, "lettura": lettura, "rischio": rischio, "fuori": fuori, "invito": invito, "dove": dove}
@@ -221,8 +230,9 @@ def pagina(c, job, f, bg, firma):
         rr = 9.4 * mm
         ring(c, x + rr, cy, rr - 1.6 * mm, rk, 3.2 * mm)
         tx = x + 2 * rr + 4 * mm
-        c.setFillColor(INK); c.setFont("C", 20); c.drawString(tx, cy + .6 * mm, f"{m['top3']} {'zona' if m['top3'] == 1 else 'zone'} su {m['N']}")
-        c.setFillColor(MUTE); c.setFont("P", 9.6); c.drawString(tx, cy - 4.4 * mm, "tra i primi 3 risultati")
+        # etichetta sopra il numero, come nella scheda dell'app
+        c.setFillColor(MUTE); c.setFont("P", 9.6); c.drawString(tx, cy + 2.6 * mm, "tra i primi 3 risultati")
+        c.setFillColor(INK); c.setFont("C", 20); c.drawString(tx, cy - 4.6 * mm, f"{m['top3']} {'zona' if m['top3'] == 1 else 'zone'} su {m['N']}")
     def testata(x, lab, sub, w):
         spaced(c, x, y - 3 * mm, lab, "MOB", 8.6, INK, .1)
         c.setFillColor(MUTE); c.setFont("P", 8.2); c.drawString(x, y - 7 * mm, sub)
@@ -245,23 +255,24 @@ def pagina(c, job, f, bg, firma):
         mappa(c, xm, my, S1, punti, rkm, bg, sede)
         numeri(xm + S1 + 6 * mm, my + S1 / 2, rkm, mm_)
     sx = xm + 2 * S + gap + gcol; sw = W - MR - sx
-    # riquadro rosso: cosa state perdendo
-    big, rt = T["rischio"]
+    # riquadro rosa: quanto vi vede chi cerca (presenza tra i primi 3 sulla piattaforma debole)
+    big, rt, chiusa = T["rischio"]
     inner = sw - 9 * mm
     p1 = P(esc(rt), "P", 10.4, 13.4, NEGTX); _, h1 = p1.wrap(inner, 100 * mm)
-    p2 = P("<b>Finché la situazione resta questa, quelle ricerche vanno agli altri.</b>", "P", 9.6, 12.4, NEGTX); _, h2 = p2.wrap(inner, 100 * mm)
+    p2 = P(f"<b>{esc(chiusa)}</b>", "P", 9.6, 12.4, NEGTX) if chiusa else None; _, h2 = p2.wrap(inner, 100 * mm) if p2 else (0, -4 * mm)
     hb = 6 * mm + 4 * mm + 15 * mm + h1 + 4 * mm + h2 + 5 * mm
     yb = y - hb
     c.setFillColor(NEGBG); c.roundRect(sx, yb, sw, hb, 1.6 * mm, stroke=0, fill=1)
     c.setFillColor(NEGBR); c.rect(sx, yb, 1.3 * mm, hb, stroke=0, fill=1)
     ix = sx + 5.5 * mm; iy = y - 6 * mm
-    spaced(c, ix, iy - 1 * mm, "Cosa state perdendo", "MOB", 8.4, NEGTX, .12)
+    spaced(c, ix, iy - 1 * mm, "Quanto vi vede chi cerca", "MOB", 8.4, NEGTX, .12)
     iy -= 4 * mm + 13 * mm
     c.setFillColor(NEGBR); c.setFont("C", 40); c.drawString(ix, iy, str(big))
     iy -= 4 * mm
     p1.drawOn(c, ix, iy - h1); iy -= h1 + 2 * mm
-    c.setStrokeColor(HexColor("#E9B9B4")); c.setLineWidth(.5); c.line(ix, iy, sx + sw - 4 * mm, iy); iy -= 2 * mm
-    p2.drawOn(c, ix, iy - h2)
+    if p2:
+        c.setStrokeColor(HexColor("#E9B9B4")); c.setLineWidth(.5); c.line(ix, iy, sx + sw - 4 * mm, iy); iy -= 2 * mm
+        p2.drawOn(c, ix, iy - h2)
     # prossimo passo e contatti: un riquadro, due colori
     eb, ti, de = T["invito"]
     pd = P(esc(de), "P", 9.4, 12.2, OKTX); _, hd = pd.wrap(sw - 9 * mm, 60 * mm)

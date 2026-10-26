@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.23.0';
+const VERSIONE = '0.24.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -80,7 +80,7 @@ const ESITO_AZIONE = { 'Nessuna risposta': ['Richiamare', 1], 'Chiuso': ['Ripass
   'Proposta inviata': ['Sentire per la decisione sulla proposta', 4], 'Obiezione': ["Rispondere all'obiezione", 2] };
 const PRIORITA = ['1 Caldo', '2 Tiepido', '0 Invisibile', '3 Rete'];   // ordine di lavoro: prima i caldi
 const PRODOTTI = ['GBP SEO', 'SEO locale', 'AI SEO', 'InRete', 'Scheda PagineGialle', 'PgCasa', 'TuttoCittà', 'Display', 'Pacchetto misto'];
-const RETI = /tecnocasa|gabetti|tempocasa|re\/?max|engel|century ?21|grimaldi|coldwell|toscano|professionecasa|frimm|soloaffitti|fondocasa|affiliato|franchising/i;
+const RETI = /tecnocasa|tecnorete|tempoagency|gabetti|tempocasa|re\/?max|engel|century ?21|grimaldi|coldwell|toscano|professionecasa|frimm|soloaffitti|fondocasa|affiliato|franchising/i;
 const MOTORE = ['motore/report.py', 'motore/foglio.py', 'motore/importa.py', 'motore/siti.py', 'motore/requirements.txt', 'motore/salva.sh', 'motore/esegui_import.sh', 'motore/esegui_report.sh', 'motore/esegui_siti.sh',
   ...['PlexCond-Bold', 'PlexCond-SemiBold', 'PlexMono-Bold', 'PlexMono-Medium', 'PlexMono-Regular', 'PlexSans-Bold', 'PlexSans-Medium', 'PlexSans-Regular', 'PlexSans-SemiBold', 'DejaVuSans'].map((f) => `motore/fonts/${f}.ttf`)];
 const WORKFLOW = { 'motore/workflows/report.yml': '.github/workflows/report.yml', 'motore/workflows/importa.yml': '.github/workflows/importa.yml', 'motore/workflows/siti.yml': '.github/workflows/siti.yml' };
@@ -521,10 +521,9 @@ function minigriglia(z, pid, opz = {}) {
 /* scheda cliente: Google AI Mode sulla stessa griglia, con le zone perse rispetto a Maps */
 function sezioneAI(z, p) {
   if (!p.pid || !z.attivita[p.pid] || !L.haAI(z)) return '';
-  const a = L.metricheAI(z, p.pid), pc = (n) => Math.round(n / a.N * 100);
+  const a = L.metricheAI(z, p.pid), pc = (n) => L.pct(n, a.N);
   return `<div class="eb">Google AI Mode · «${esc(z.meta.keyword)}»</div>
-  <div class="stat"><div><b class="c-${L.colorePct(pc(a.top3))}">${a.top3}/${a.N}</b><span>tra le prime 3</span></div>
-  <div><b class="c-${L.colorePct(pc(a.top20))}">${a.top20}/${a.N}</b><span>presente</span></div></div>
+  <div class="stat"><div><span>tra le prime 3</span><b class="c-${L.colorePct(pc(a.top3))}">${a.top3}/${a.N}<small>${pc(a.top3)}%</small></b></div></div>
   <div class="mt">${minigriglia(z, p.pid, { ai: true })}</div>`;
 }
 function apriProspect(zid, id, opz = {}) {
@@ -563,9 +562,8 @@ function apriProspect(zid, id, opz = {}) {
     <div class="scelte">${[0, 1, 3, 7].map((n) => `<button class="chip" data-quando="${n}">${n === 0 ? 'Oggi' : n === 1 ? 'Domani' : '+' + n + ' gg'}</button>`).join('')}</div>
   </div>
   ${m ? `<div class="eb">Google Maps · «${esc(z.meta.keyword)}»</div>
-  <div class="stat"><div><b class="c-${L.colorePct(Math.round(m.top3 / m.N * 100))}">${m.top3}/${m.N}</b><span>tra le prime 3</span></div>
-  <div><b class="c-${L.colorePct(Math.round(m.top20 / m.N * 100))}">${m.top20}/${m.N}</b><span>presente</span></div>
-  <div><b>${a.rv ?? '—'}</b><span>recensioni ${L.virgola(a.r)}</span></div></div>
+  <div class="stat"><div><span>tra le prime 3</span><b class="c-${L.colorePct(L.pct(m.top3, m.N))}">${m.top3}/${m.N}<small>${L.pct(m.top3, m.N)}%</small></b></div>
+  <div><span>recensioni ${L.virgola(a.r)}</span><b>${a.rv ?? '—'}</b></div></div>
   <div class="mt">${minigriglia(z, p.pid)}</div>
   ${sezioneAI(z, p)}
   ${an ? `<div class="box classifica"><b>${esc(an.list_title)}</b><table class="cl">${an.list.map(([r, n, rv, me]) => `<tr class="${me ? 'me' : ''}"><td>${r || '20+'}</td><td>${esc(n)}</td><td style="text-align:right" class="mono">${esc(rv)}</td></tr>`).join('')}</table></div>` : ''}` : '<div class="avviso mt">Attività non presente nella scansione della zona: niente metriche né report.</div>'}
@@ -1173,7 +1171,7 @@ function vCruscotto() {
     <button><b>${regs.filter((r) => r.data >= sett).length}</b><span>Contatti ultimi 7 gg</span></button>
     <button><b>${regs.filter((r) => esitiDi(r).includes('Appuntamento fissato')).length}</b><span>Appuntamenti fissati</span></button>
     <button><b class="c-top">${vinti.length}</b><span>Vinti</span></button>
-    <button><b>${vinti.length + persi.length ? Math.round(vinti.length / (vinti.length + persi.length) * 100) + '%' : '—'}</b><span>Tasso di chiusura</span></button>
+    <button><b>${vinti.length + persi.length ? L.pct(vinti.length, vinti.length + persi.length) + '%' : '—'}</b><span>Tasso di chiusura</span></button>
     <button><b>${eur(vinti.reduce((s, x) => s + (+x.p.valore || 0), 0))}</b><span>Valore firmato</span></button>
     <button><b>${eur(tt.filter((x) => aperto(x.p)).reduce((s, x) => s + (+x.p.valore || 0), 0))}</b><span>Valore in proposta</span></button></div>
   <div class="eb">Imbuto per stato</div>
