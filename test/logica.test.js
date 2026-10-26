@@ -182,3 +182,24 @@ test('L.pct: X,5 per difetto, oltre per eccesso', () => {
   assert.equal(L.pct(3, 49), 6);      // 6,12 → 6
   assert.equal(L.pct(0, 49), 0); assert.equal(L.pct(49, 49), 100); assert.equal(L.pct(1, 0), 0);
 });
+
+test('L.priorita: con AI Mode decide AI Mode, senza resta Maps', () => {
+  const z = zona('2026-10-23');
+  const pid = Object.keys(z.attivita)[0];
+  const N = z.punti.length;
+  const conAI = (rank, rv) => ({ ...z, attivita: { ...z.attivita, [pid]: { ...z.attivita[pid], rv } },
+    punti_ai: z.punti.map(([la, lo], i) => [la, lo, rank(i) ? Array(rank(i) - 1).fill('altro').concat(pid) : ['altro']]) });
+  assert.equal(L.priorita(z, pid, true).prio, '3 Rete');
+  // AI Mode non lo cita mai: invisibile, caldo se ha almeno 20 recensioni
+  assert.equal(L.priorita(conAI(() => 0, 5), pid).prio, '0 Invisibile');
+  assert.equal(L.priorita(conAI(() => 0, 25), pid).prio, '1 Caldo');
+  // citato ma tra i primi 3 in meno di metà delle zone: caldo con 20+ recensioni, altrimenti tiepido
+  assert.equal(L.priorita(conAI((i) => (i === 0 ? 2 : 6), 30), pid).prio, '1 Caldo');
+  assert.equal(L.priorita(conAI((i) => (i === 0 ? 2 : 6), 10), pid).prio, '2 Tiepido');
+  // forte su AI Mode (tra i primi 3 ovunque): tiepido anche con molte recensioni
+  assert.equal(L.priorita(conAI(() => 1, 300), pid).prio, '2 Tiepido');
+  assert.equal(L.priorita(conAI(() => 1, 300), pid).base, 'ai');
+  assert.equal(L.priorita(z, pid).base, 'maps');
+  assert.equal(N > 0, true);
+  assert.match(L.gancio(conAI(() => 0, 5), pid), /^Google AI Mode non la cita/);
+});

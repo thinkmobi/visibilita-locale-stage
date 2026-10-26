@@ -32,7 +32,8 @@ Questo repo contiene solo codice. I dati stanno nel repo privato `thinkmobi/visi
 - Alert con i colori della palette in versione chiara, mai pieni.
 - Etichette di stato che descrivono l'azione reale («Consegnato», «Visitare», «Ripassare»), mai «Fatto».
 - Orari a 24 ore, fuso Europe/Rome.
-- Priorità: 1 Caldo (verde), 2 Tiepido (arancione), 0 Invisibile (blu), 3 Rete (grigio). Invisibile con almeno 20 recensioni → Caldo.
+- Priorità: 1 Caldo (verde), 2 Tiepido (arancione), 0 Invisibile (blu), 3 Rete (grigio). Con la scansione AI Mode il criterio è AI Mode (`L.priorita`): Invisibile = AI Mode non lo cita in nessuna zona; Caldo = almeno 20 recensioni e tra i primi 3 su AI Mode in meno di metà delle zone (anche se invisibile); Tiepido = gli altri. Senza AI Mode resta il criterio su Maps (invisibile con almeno 20 recensioni → Caldo).
+- AI Mode è la piattaforma primaria: viene prima di Maps in fogli, scheda prospect ed elenco attività.
 - Posizioni in cifre («al 6° posto»), via `L.alPosto`.
 - Barre di salvataggio uguali in tutti i fogli: «Chiudi» grigio senza modifiche, «Annulla» rosso con modifiche; a destra «✓ Salvato alle HH:MM».
 - Nomi con iniziali maiuscole; sigle e marchi intatti (RE/MAX, D&D); forme societarie minuscole (s.a.s., srl).

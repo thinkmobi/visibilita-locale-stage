@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.28.2';
+const VERSIONE = '0.28.3';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -567,11 +567,10 @@ function apriProspect(zid, id, opz = {}) {
     <label class="f">Priorità${sel('priorita', PRIORITA, p.priorita, prioTesto)}</label></div>
     <div class="scelte">${[0, 1, 3, 7].map((n) => `<button class="chip" data-quando="${n}">${n === 0 ? 'Oggi' : n === 1 ? 'Domani' : '+' + n + ' gg'}</button>`).join('')}</div>
   </div>
-  ${m ? `<div class="eb">Google Maps · «${esc(z.meta.keyword)}»</div>
+  ${m ? `${sezioneAI(z, p)}<div class="eb">Google Maps · «${esc(z.meta.keyword)}»</div>
   <div class="stat"><div><span>tra le prime 3</span><b class="c-${L.colorePct(L.pct(m.top3, m.N))}">${m.top3}/${m.N}<small>${L.pct(m.top3, m.N)}%</small></b></div>
   <div><span>recensioni ${L.virgola(a.r)}</span><b>${a.rv ?? '—'}</b></div></div>
   <div class="mt">${minigriglia(z, p.pid)}</div>
-  ${sezioneAI(z, p)}
   ${an ? `<div class="box classifica"><b>${esc(an.list_title)}</b><table class="cl">${an.list.map(([r, n, rv, me]) => `<tr class="${me ? 'me' : ''}"><td>${r || '20+'}</td><td>${esc(n)}</td><td style="text-align:right" class="mono">${esc(rv)}</td></tr>`).join('')}</table></div>` : ''}` : '<div class="avviso mt">Attività non presente nella scansione della zona: niente metriche né report.</div>'}
   <div class="eb" id="registroP">Registro (${reg.length})</div>
   ${reg.map((r) => `<div class="reg"><div class="riga"><b>${esc(r.esito || r.canale)}</b><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}</span></div>
@@ -1030,9 +1029,10 @@ function vZone() {
 function rigaAttivita(zid, z, pid, a, m, p) {
   const pc = (n) => L.pct(n, m.N);
   const ai = L.metricheAI(z, pid);
-  const vicine = m.ranks.filter((r) => r && r >= 4 && r <= 10).length;   // zone al 4°-10° posto: le più facili da portare tra le prime 3
+  // zone al 4°-10° posto: le più facili da portare tra le prime 3. Su AI Mode quando c'è (piattaforma primaria), altrimenti su Maps
+  const vicine = (ai || m).ranks.filter((r) => r && r >= 4 && r <= 10).length;
   const sito = (() => { const si = sitoInfo(z, { pid, sito: '' }); return si.k === 'ok' ? ' · ' + esc(si.label) : ' · <b class="c-mid">' + esc(si.label.toLowerCase()) + '</b>'; })();
-  const base = `Maps ${m.top3}/${m.N} top 3 (${pc(m.top3)}%)${ai ? ` · AI Mode ${ai.top3}/${ai.N} (${L.pct(ai.top3, ai.N)}%)` : ''} · ${a.rv || 0} rec. ${L.virgola(a.r)}`;
+  const base = `${ai ? `AI Mode ${ai.top3}/${ai.N} top 3 (${L.pct(ai.top3, ai.N)}%) · Maps ${m.top3}/${m.N} (${pc(m.top3)}%)` : `Maps ${m.top3}/${m.N} top 3 (${pc(m.top3)}%)`} · ${a.rv || 0} rec. ${L.virgola(a.r)}`;
   const nr = a.c === false && a.cv ? ' · <b class="c-neg">non rivendicata</b>' : '';
   if (!p) return `<div class="card"><div class="riga"><span class="nome">${esc(a.n)}</span><button class="btn mini" data-nuovo="${pid}">+ Prospect</button></div>
     <div class="sub">${base}${nr}${sito}${RETI.test(a.n) ? ' · rete' : ''}</div></div>`;
@@ -1042,7 +1042,7 @@ function rigaAttivita(zid, z, pid, a, m, p) {
     : (aperto(p) ? `<button class="btn mini" data-zgiro="${esc(p.id)}">+ Giro ${gg(dataGiroProposta())}</button>` : '');
   return `<div class="card zprospect"><div class="riga"><a class="nome" href="#p/${zid}/${p.id}">${esc(p.nome || a.n)}</a><span class="pill p${(p.priorita || '9')[0]}">${prioHtml(p.priorita)}</span></div>
     <div class="sub">${base}${nr}${sito}</div>
-    <div class="sub">${vicine ? `<b>${vicine} zone al 4°-10° posto</b>: a un passo dalle prime 3` : 'Nessuna zona al 4°-10° posto'}</div>
+    <div class="sub">${vicine ? `<b>${vicine} zone al 4°-10° posto${ai ? ' su AI Mode' : ''}</b>: a un passo dalle prime 3` : `Nessuna zona al 4°-10° posto${ai ? ' su AI Mode' : ''}`}</div>
     <div class="riga mt" style="justify-content:flex-start;gap:8px;flex-wrap:wrap"><span class="sub">${esc(p.stato)}${ult ? ` · ultimo contatto ${gg(ult.data)}: ${esc(ult.esito || ult.canale)}` : ' · mai contattato'}</span>${giro}</div></div>`;
 }
 function apriZona(zid) {
@@ -1050,15 +1050,16 @@ function apriZona(zid) {
   const z = s.z; const giaP = new Set(Object.values(z.prospect || {}).filter((p) => !p.del).map((p) => p.pid));
   const prosDi = {}; Object.values(z.prospect || {}).filter((p) => !p.del).forEach((p) => { prosDi[p.pid] = p; });
   const ord = ST.f.ordZ && ST.f.ordZ !== 'top20' ? ST.f.ordZ : 'top3';   // solo le prime 3 posizioni contano: niente ordinamento per presenza
-  const righe = Object.entries(z.attivita || {}).map(([pid, a]) => ({ pid, a, m: L.metriche(z, pid) }))
+  const campo = L.haAI(z) ? 'punti_ai' : 'punti';   // AI Mode guida l'ordinamento «Top 3» quando c'è
+  const righe = Object.entries(z.attivita || {}).map(([pid, a]) => ({ pid, a, m: L.metriche(z, pid), mo: L.metriche(z, pid, campo) }))
     .filter((r) => !ST.f.soloNuove || !giaP.has(r.pid))
-    .sort((x, y) => ord === 'rv' ? (y.a.rv || 0) - (x.a.rv || 0) : ord === 'nome' ? x.a.n.localeCompare(y.a.n) : (y.m[ord] - x.m[ord]) || ((y.a.rv || 0) - (x.a.rv || 0)));
+    .sort((x, y) => ord === 'rv' ? (y.a.rv || 0) - (x.a.rv || 0) : ord === 'nome' ? x.a.n.localeCompare(y.a.n) : (y.mo.top3 - x.mo.top3) || (y.m.top3 - x.m.top3) || ((y.a.rv || 0) - (x.a.rv || 0)));
   const f = apriFoglio(`${z.meta.quartiere} · ${z.meta.keyword}`, `
   <div class="sub">Rilevazione del ${esc(z.meta.data_testo)} · griglia ${esc(z.meta.lato)} · ${(z.punti || []).length} punti · ${L.haAI(z) ? 'AI Mode importato' : 'AI Mode assente'}</div>
   <div class="sub mt">${s.siti && s.siti.aggiornato ? `Siti controllati il ${oraRoma(s.siti.aggiornato, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${Object.values(s.siti.siti).filter((v) => STATO_SITO[v.stato]).length} non funzionanti su ${Object.keys(s.siti.siti).length}` : 'Siti non ancora controllati'}</div>
   <div class="row mt"><button class="btn mini" id="zSiti">Ricontrolla siti</button><button class="btn mini" id="zPdf">Ultimo PDF</button><button class="btn mini" id="zTesti">Testi della zona</button><button class="btn mini" id="zEsporta">Esporta CSV</button><button class="btn mini" id="zAI">${L.haAI(z) ? 'Aggiorna AI Mode' : 'Aggiungi AI Mode'}</button></div>
   <div class="eb">Attività trovate</div>
-  <div class="filtri">${[['top3', 'Top 3'], ['rv', 'Recensioni'], ['nome', 'Nome']].map(([k, l]) => `<button class="chip ${ord === k ? 'on' : ''}" data-ord="${k}">${l}</button>`).join('')}
+  <div class="filtri">${[['top3', L.haAI(z) ? 'Top 3 AI Mode' : 'Top 3'], ['rv', 'Recensioni'], ['nome', 'Nome']].map(([k, l]) => `<button class="chip ${ord === k ? 'on' : ''}" data-ord="${k}">${l}</button>`).join('')}
   <button class="chip ${ST.f.soloNuove ? 'on' : ''}" id="soloNuove">Solo non in lista</button></div>
   <div class="lista">${righe.slice(0, 150).map(({ pid, a, m }) => rigaAttivita(zid, z, pid, a, m, prosDi[pid])).join('')}</div>`,
   () => { location.hash = '#zone'; });
@@ -1089,8 +1090,9 @@ function nuovoProspect(zid, pid) {
   let id; do id = 'P' + String(n).padStart(2, '0') + Math.random().toString(36).slice(2, 4); while (z.prospect && z.prospect[id]);
   const rete = RETI.test(a.n);
   // gli invisibili con almeno 20 recensioni tengono a Google: passano tra i caldi
-  const prio = rete ? '3 Rete' : (a.rv || 0) >= 20 && (!m.top20 || !m.top3) ? '1 Caldo' : !m.top20 ? '0 Invisibile' : '2 Tiepido';
-  const gancio = !m.top20 ? `Non compare tra i primi 20 in nessuno dei ${m.N} punti` : `${a.rv || 0} recensioni a ${L.virgola(a.r)}; nel top 3 in ${m.top3} punti su ${m.N}, presente in ${m.top20}`;
+  // priorità e gancio da AI Mode quando la zona ha la scansione AI (taglio primario dei fogli), altrimenti da Google Maps
+  const prio = L.priorita(z, pid, rete).prio;
+  const gancio = L.gancio(z, pid);
   z.prospect[id] = { id, pid, nome: maiuscole(a.n), priorita: prio, stato: 'Da contattare', prossima: rete ? 'Gestione separata franchising' : "Consegnare il report e proporre l'incontro", data_prossima: '',
     referente: '', telefono: a.t || '', email: '', sito: a.w || '', indirizzo: a.a || '', gancio, prodotto: '', valore: 0, segmento: rete ? 'Franchising' : 'Indipendente', note: '',
     giro: {}, report: { includi: !rete, luogo: rete ? 'agenzia' : undefined }, u: ora() };

@@ -177,6 +177,36 @@
   });
 
   /* fogli da lasciare porta a porta (A4 orizzontale, uno per attività): Maps contro AI Mode sulla stessa griglia */
+  /* priorità di un nuovo prospect. Con la scansione AI Mode il criterio è AI Mode (il taglio primario dei fogli):
+     invisibile = AI Mode non lo cita in nessuna zona; caldo = almeno 20 recensioni e tra i primi 3 su AI Mode in meno di metà delle zone
+     (reputazione da difendere, visibilità AI da costruire); tiepido = tutti gli altri. Senza AI Mode resta il criterio su Google Maps. */
+  L.SOGLIA_REC = 20;
+  L.priorita = (z, pid, rete) => {
+    const a = (z.attivita || {})[pid] || {};
+    const rv = a.rv || 0;
+    if (rete) return { prio: '3 Rete', base: L.haAI(z) ? 'ai' : 'maps' };
+    if (L.haAI(z)) {
+      const m = L.metriche(z, pid, 'punti_ai');
+      const debole = L.pct(m.top3, m.N) < 50;
+      const prio = !m.top20 ? (rv >= L.SOGLIA_REC ? '1 Caldo' : '0 Invisibile') : (rv >= L.SOGLIA_REC && debole ? '1 Caldo' : '2 Tiepido');
+      return { prio, base: 'ai' };
+    }
+    const m = L.metriche(z, pid);
+    const prio = rv >= L.SOGLIA_REC && (!m.top20 || !m.top3) ? '1 Caldo' : !m.top20 ? '0 Invisibile' : '2 Tiepido';
+    return { prio, base: 'maps' };
+  };
+  /* gancio commerciale: parte da AI Mode quando c'è */
+  L.gancio = (z, pid) => {
+    const a = (z.attivita || {})[pid] || {};
+    const m = L.metriche(z, pid);
+    const rec = `${a.rv || 0} recensioni a ${L.virgola(a.r)}`;
+    if (L.haAI(z)) {
+      const ai = L.metriche(z, pid, 'punti_ai');
+      return (!ai.top20 ? `Google AI Mode non la cita in nessuna delle ${ai.N} zone` : `Google AI Mode la mette tra i primi 3 in ${ai.top3} zone su ${ai.N} (${L.pct(ai.top3, ai.N)}%)`) +
+        `; su Google Maps in ${m.top3} (${L.pct(m.top3, m.N)}%); ${rec}`;
+    }
+    return !m.top20 ? `Non compare tra i primi 20 in nessuno dei ${m.N} punti` : `${rec}; nel top 3 in ${m.top3} punti su ${m.N}, presente in ${m.top20}`;
+  };
   L.haAI = (z) => !!(z && z.punti_ai && z.punti && z.punti_ai.length === z.punti.length);
   /* AI Mode della stessa attività: metriche sulla griglia AI e zone in cui Maps la mette tra i primi 3 e AI Mode no */
   L.metricheAI = (z, pid) => {
