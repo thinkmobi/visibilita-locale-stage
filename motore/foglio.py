@@ -274,7 +274,17 @@ def pagina(c, job, f, bg, firma):
         testata(xm, "Google Maps", "la mappa di Google", largo)
         my = y - head_h - 1.6 * mm - S1
         mappa(c, xm, my, S1, punti, rkm, bg, sede)
-        numeri(xm + S1 + 6 * mm, my + S1 / 2, rkm, mm_)
+        # anello grande sopra la scritta, centrati nello spazio tra la mappa e la colonna destra
+        x0, x1 = xm + S1 + 4 * mm, xm + 2 * S + gap + gcol - 4 * mm
+        cx = (x0 + x1) / 2; rr = min((x1 - x0) / 2 - 2 * mm, 21 * mm)
+        frase = f"{mm_['top3']} {'zona' if mm_['top3'] == 1 else 'zone'} su {mm_['N']}"
+        fs = 26
+        while fs > 16 and c.stringWidth(frase, "C", fs) > x1 - x0: fs -= 1
+        hblk = 2 * rr + 6 * mm + 4 * mm + fs * .36 * mm
+        top = my + S1 / 2 + hblk / 2
+        ring(c, cx, top - rr, rr - rr * .17, rkm, rr * .34)
+        c.setFillColor(MUTE); c.setFont("P", 10.4); c.drawCentredString(cx, top - 2 * rr - 6 * mm, "tra i primi 3 risultati")
+        c.setFillColor(INK); c.setFont("C", fs); c.drawCentredString(cx, top - hblk, frase)
     sx = xm + 2 * S + gap + gcol; sw = W - MR - sx
     # riquadro rosa: quanto vi vede chi cerca (presenza tra i primi 3: AI Mode e Maps, oppure solo Maps)
     doppio = isinstance(T["rischio"], dict)
