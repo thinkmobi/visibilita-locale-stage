@@ -379,7 +379,8 @@ test('11. service worker: si registra e dopo il primo caricamento l’app si apr
     await t.page.waitForSelector('#vista');
     assert.match(await testoVista(t.page), /Agenzia Alfa/);
     const chiavi = await t.page.evaluate(async () => (await caches.keys()));
-    assert.ok(chiavi.some((k) => /^vl-\d+\.\d+\.\d+$/.test(k)), 'cache vl-<versione> assente: ' + chiavi);
+    // una cache per ambiente (produzione e stage condividono il sito): vl-<versione>@prod dalla radice del banco
+    assert.ok(chiavi.some((k) => /^vl-\d+\.\d+\.\d+@prod$/.test(k)), 'cache vl-<versione>@prod assente: ' + chiavi);
   } finally { await t.chiudi(); }
 });
 

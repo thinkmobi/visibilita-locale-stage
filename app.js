@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.22.1';
+const VERSIONE = '0.23.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -195,7 +195,7 @@ function unisci(loc, rem) {
   const lm = loc.meta || {}, rm = rem.meta || {};
   const scansioneLoc = (lm.data || '') > (rm.data || '') || ((lm.data || '') === (rm.data || '') && lm.report_key !== rm.report_key && (lm.u || 0) > (rm.u || 0));
   const base = scansioneLoc ? lm : rm, testi = piuRecente(lm, rm);
-  if (scansioneLoc && loc.punti) z.punti = loc.punti;
+  if (scansioneLoc && loc.punti) { z.punti = loc.punti; if (loc.punti_ai) z.punti_ai = loc.punti_ai; else delete z.punti_ai; }   // la griglia AI segue la sua scansione Maps
   z.meta = { ...base };
   if (rem.punti_ai && !scansioneLoc) for (const k of ['report_key_ai', 'data_ai']) if (rm[k] !== undefined) z.meta[k] = rm[k];
   for (const k of ['frase_kw', 'centrata', 'luogo', 'prossimo_passo', 'quartiere', 'citta', 'categoria']) if (testi[k] !== undefined) z.meta[k] = testi[k];
@@ -346,7 +346,7 @@ function righeGriglia(z) {
   _righe.set(z.punti, rows); return rows;
 }
 function miniMappa(z, p, px = 54) {
-  if (!p.pid || !z.punti || !z.attivita[p.pid]) return `<span class="mini vuota" style="width:${px}px;height:${px}px" title="Non presente nella scansione"></span>`;
+  if (!p.pid || !z.punti || !z.punti.length || !z.attivita[p.pid]) return `<span class="mini vuota" style="width:${px}px;height:${px}px" title="Non presente nella scansione"></span>`;
   const rows = righeGriglia(z); const n = rows.length; const c = px / n; const r = c * 0.42;
   const ranks = L.metriche(z, p.pid).ranks; const vic = L.puntiOrdinati(z, p)[0].i;
   let dots = '';
@@ -542,7 +542,7 @@ function apriProspect(zid, id, opz = {}) {
   <div class="badges">${badgeSito(z, p)}${badgePG(p)}</div>
   <div class="box pg-box"><div class="riga"><b>PagineGialle</b><a class="btn mini" href="${urlPG(z, p)}" target="_blank" rel="noopener">Cerca su PagineGialle ↗</a></div>
   <div class="scelte">${Object.entries(PG).map(([k, v]) => `<button class="chip ${p.pg === k ? 'on' : ''}" data-pg="${k}">${k === 'assente' ? 'Assente' : k === 'base' ? 'Scheda base' : 'Scheda evoluta'}</button>`).join('')}</div></div>
-  ${a.c === false ? `<div class="allerta"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg><div><b>Scheda Google non rivendicata dal titolare</b><span>Nessuno la gestisce: non può rispondere alle recensioni né correggere orari e categoria. È il primo gancio da usare.</span></div></div>` : ''}
+  ${nonRiv(z, p) ? `<div class="allerta"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg><div><b>Scheda Google non rivendicata dal titolare</b><span>Nessuno la gestisce: non può rispondere alle recensioni né correggere orari e categoria. È il primo gancio da usare.</span></div></div>` : ''}
   <div class="azioni">
     <a class="btn" ${t ? `href="tel:${tel(t)}"` : 'aria-disabled="true"'}>${ico('tel')}Chiama</a>
     <a class="btn" ${t ? `href="https://wa.me/${wa(t)}" target="_blank" rel="noopener"` : 'aria-disabled="true"'}>${ico('wa')}WhatsApp</a>
@@ -779,7 +779,8 @@ function vGiro() {
   date.sort();
   const d = ST.giroData;
   // tappe ancora da fare per data, per il numero sulle date
-  const daFare = {}; tt.forEach((x) => { if (!x.p.giro.fatto && aperto(x.p)) daFare[x.p.giro.data] = (daFare[x.p.giro.data] || 0) + 1; });
+  // numero sulle date: tappe ancora da visitare, con la stessa regola del filtro «Visitare»
+  const daFare = {}; tt.forEach((x) => { const g = x.p.giro.data; if (!x.p.giro.fatto && aperto(x.p) && inLavoro(x) && !registro(x.zid, x.p.id).some((r) => r.data === g)) daFare[g] = (daFare[g] || 0) + 1; });
   const domani = new Date(og + 'T12:00'); domani.setDate(domani.getDate() + 1); const dm = domani.toISOString().slice(0, 10);
   const etichettaData = (x) => (x === og ? 'Oggi' : x === dm ? 'Domani' : ggLungo(x)) + (daFare[x] ? ` · ${daFare[x]}` : '');
   const prossima = date.find((x) => x > og && daFare[x]);
@@ -905,7 +906,10 @@ function scegliTappa() {
   f.addEventListener('click', (e) => {
     const b = e.target.closest('[data-add]'); if (!b) return;
     const [zid, id] = b.dataset.add.split('|');
-    aggiorna(zid, id, { giro: { data: ST.giroData, ordine: prossimoOrdine(zid, ST.giroData), orario: '', fatto: false } }); b.remove(); toast('Aggiunto');
+    const prima = ST.zone[zid].z.prospect[id].giro, da = prima && prima.data;
+    aggiorna(zid, id, { giro: { data: ST.giroData, ordine: prossimoOrdine(zid, ST.giroData), orario: '', fatto: false } });
+    if (da && da !== ST.giroData) { rinumera(zid, da); modificato(zid); }   // il giro di partenza non resta con un buco nei numeri
+    b.remove(); toast(da && da !== ST.giroData ? `Aggiunto (tolto dal giro del ${gg(da)})` : 'Aggiunto');
   });
 }
 async function generaPdf(zid, tipo = 'giro') {
@@ -983,9 +987,9 @@ function lavoroZona(z) {
   const prox = ap.filter((p) => p.giro && p.giro.data && !p.giro.fatto && p.giro.data >= og).map((p) => p.giro.data).sort()[0];
   const pill = (cl, t) => `<span class="stato-tappa ${cl}">${t}</span>`;
   const out = [];
-  if (vis.length) out.push(pill('', `${vis.length} da visitare`));
-  if (rip.length) out.push(pill('ripassare', `↻ ${rip.length} da ripassare`));
-  if (ric.length) out.push(pill(scad ? 'ni' : 'ripassare', `${ric.length} da richiamare${scad ? ` (${scad} in ritardo)` : ''}`));
+  if (vis.length) out.push(pill('', `Visitare · ${vis.length}`));
+  if (rip.length) out.push(pill('ripassare', `↻ Ripassare · ${rip.length}`));
+  if (ric.length) out.push(pill(scad ? 'ni' : 'ripassare', `Richiamare · ${ric.length}${scad ? ` (${scad} in ritardo)` : ''}`));
   if (rc.length) out.push(pill('rc', `${rc.length} report completo`));
   if (nuovi.length) out.push(pill('visitata', `${nuovi.length} mai ${nuovi.length === 1 ? 'contattato' : 'contattati'}`));
   if (!out.length) out.push(pill('', 'Niente in sospeso'));
@@ -1016,7 +1020,7 @@ function apriZona(zid) {
   <div class="filtri">${[['top20', 'Presenza'], ['top3', 'Top 3'], ['rv', 'Recensioni'], ['nome', 'Nome']].map(([k, l]) => `<button class="chip ${ord === k ? 'on' : ''}" data-ord="${k}">${l}</button>`).join('')}
   <button class="chip ${ST.f.soloNuove ? 'on' : ''}" id="soloNuove">Solo non in lista</button></div>
   <div class="lista">${righe.slice(0, 150).map(({ pid, a, m }) => `<div class="card"><div class="riga"><span class="nome">${esc(a.n)}</span>${giaP.has(pid) ? '<span class="pill">in lista</span>' : `<button class="btn mini" data-nuovo="${pid}">+ Prospect</button>`}</div>
-    <div class="sub">${m.top3}/${m.N} top 3 · ${m.top20}/${m.N} top 20 · ${a.rv || 0} rec. ${L.virgola(a.r)}${a.c === false ? ' · <b class="c-neg">non rivendicata</b>' : ''}${(() => { const si = sitoInfo(z, { pid, sito: '' }); return si.k === 'ok' ? ' · ' + esc(si.label) : ' · <b class="c-mid">' + esc(si.label.toLowerCase()) + '</b>'; })()}${RETI.test(a.n) ? ' · rete' : ''}</div></div>`).join('')}</div>`,
+    <div class="sub">${m.top3}/${m.N} top 3 · ${m.top20}/${m.N} top 20 · ${a.rv || 0} rec. ${L.virgola(a.r)}${a.c === false && a.cv ? ' · <b class="c-neg">non rivendicata</b>' : ''}${(() => { const si = sitoInfo(z, { pid, sito: '' }); return si.k === 'ok' ? ' · ' + esc(si.label) : ' · <b class="c-mid">' + esc(si.label.toLowerCase()) + '</b>'; })()}${RETI.test(a.n) ? ' · rete' : ''}</div></div>`).join('')}</div>`,
   () => { location.hash = '#zone'; });
   f.querySelectorAll('[data-ord]').forEach((b) => (b.onclick = () => { ST.f.ordZ = b.dataset.ord; apriZona(zid); }));
   $('#soloNuove', f).onclick = () => { ST.f.soloNuove = !ST.f.soloNuove; apriZona(zid); };
@@ -1049,7 +1053,7 @@ function nuovoProspect(zid, pid) {
   modificato(zid); toast('Aggiunto ' + a.n); apriZona(zid);
 }
 function testiZona(zid) {
-  const z = ST.zone[zid].z, m = z.meta, pp = m.prossimo_passo;
+  const z = ST.zone[zid].z, m = z.meta, pp = m.prossimo_passo || { intro: '', outro: '', items: [] };
   const f = apriFoglio('Testi della zona', `
   <div class="due"><label class="f">Quartiere<input data-m="quartiere" value="${esc(m.quartiere)}"></label><label class="f">Città<input data-m="citta" value="${esc(m.citta)}"></label></div>
   <div class="due"><label class="f">Categoria (nome file)<input data-m="categoria" value="${esc(m.categoria)}"></label><label class="f">Centrata… (es. sulla Crocetta)<input data-m="centrata" value="${esc(m.centrata)}"></label></div>
@@ -1144,7 +1148,7 @@ async function importaFile(files) {
   if (!json) { toast('Seleziona zona.json (e facoltativamente sfondo.png)'); return; }
   try {
     const z = JSON.parse(await json.text());
-    if (!z.id || !z.meta || !z.punti) throw new Error('File non valido: manca id, meta o punti');
+    if (!z.id || !z.meta || !Array.isArray(z.punti) || !z.punti.length) throw new Error('File non valido: manca id, meta o punti');
     const esist = ST.zone[z.id];
     if (esist && !confirm(`La zona ${z.id} esiste già. Unire i dati del file con quelli presenti?`)) return;
     ST.zone[z.id] = esist ? { ...esist, z: unisci(z, esist.z) } : { z, sha: null, dirty: true };
@@ -1262,7 +1266,7 @@ function vAltro() {
   const c = ST.cfg, fi = ST.conf.firma || {};
   return `<div class="eb">Collegamento GitHub</div>
   <label class="f">Utente o organizzazione<input id="cOwner" value="${esc(c.owner || '')}" autocapitalize="off"></label>
-  <label class="f">Repository dati (privato)<input id="cRepo" value="${esc(c.repo || 'visibilita-dati')}" autocapitalize="off"></label>
+  <label class="f">Repository dati (privato)<input id="cRepo" value="${esc(c.repo || (AMBIENTE === 'stage' ? 'visibilita-dati-stage' : 'visibilita-dati'))}" autocapitalize="off"></label>
   <label class="f">Token (fine-grained, solo questo repository)<input id="cTok" type="password" value="${esc(c.token || '')}" autocomplete="off"></label>
   <div class="row mt"><button class="btn pri" id="cSalva">Salva e prova</button><button class="btn" id="cInit">Prepara / aggiorna repository</button></div>
   <div id="cEsito" class="sub mt"></div>
@@ -1276,12 +1280,16 @@ function vAltro() {
 }
 async function preparaRepo(out) {
   if (!GH.ok()) { out.textContent = 'Compila prima utente, repository e token.'; return; }
+  // il motore di un ambiente non va copiato nei dati dell'altro
+  if (avvisoAmbiente()) { out.innerHTML = `<span class="c-neg">App di ${AMB_NOME.toLowerCase()} collegata a ${esc(ST.cfg.repo)}: correggi il repository prima di preparare.</span>`; return; }
   const file = [...MOTORE.map((p) => [p, p]), ...Object.entries(WORKFLOW)];
   let n = 0;
   try {
     for (const [src, dst] of file) {
       out.textContent = `Copio ${dst} (${++n}/${file.length + 1})…`;
-      const buf = await (await fetch(src, { cache: 'no-store' })).arrayBuffer();
+      const rs = await fetch(src, { cache: 'no-store' });
+      if (!rs.ok) throw new Error(`${src} non disponibile (${rs.status}): riprova tra un minuto`);   // es. Pages in aggiornamento
+      const buf = await rs.arrayBuffer();
       const b64 = await bufB64(buf);
       const cur = await GH.req(dst); const curJ = cur && await cur.json();
       if (curJ && curJ.content && curJ.content.replace(/\n/g, '') === b64) continue;
@@ -1362,7 +1370,15 @@ function legaVista(v) {
   }
   if (v === 'altro') {
     $('#cSalva').onclick = async () => {
-      ST.cfg = { owner: $('#cOwner').value.trim(), repo: $('#cRepo').value.trim(), token: $('#cTok').value.trim() };
+      const nuovo = { owner: $('#cOwner').value.trim(), repo: $('#cRepo').value.trim(), token: $('#cTok').value.trim() };
+      // cambio di repository (es. produzione ↔ stage): le zone in locale sono del vecchio e non devono finire nel nuovo
+      if (ST.cfg.owner && ST.cfg.repo && (nuovo.owner !== ST.cfg.owner || nuovo.repo !== ST.cfg.repo)) {
+        const sospese = Object.values(ST.zone).filter((s) => s.dirty).length;
+        if (sospese && !confirm(`${sospese} ${sospese === 1 ? 'zona ha' : 'zone hanno'} modifiche non ancora inviate a ${ST.cfg.repo}: passando a ${nuovo.repo} vanno perse. Continuare?`)) return;
+        for (const k of await DB.keys()) if (String(k).startsWith('zona:')) await DB.del(k);
+        ST.zone = {}; ST.giroGiorno = null;
+      }
+      ST.cfg = nuovo;
       await DB.set('cfg', ST.cfg); try { localStorage.setItem(CHIAVE_CFG, JSON.stringify(ST.cfg)); } catch (e) { /* copia di riserva non disponibile */ } const out = $('#cEsito');
       try { const r = await fetch(`https://api.github.com/repos/${ST.cfg.owner}/${ST.cfg.repo}`, { cache: 'no-store', headers: { Authorization: `Bearer ${ST.cfg.token}` } });
         if (!r.ok) throw new Error(r.status === 404 ? 'Repository non trovato o token senza accesso' : r.status === 401 ? 'Token non valido' : 'GitHub ' + r.status);

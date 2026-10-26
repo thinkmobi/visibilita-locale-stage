@@ -195,7 +195,7 @@
       keyword: z.meta.keyword, frase_kw: z.meta.frase_kw, centrata: z.meta.centrata, lato: z.meta.lato, data_testo: z.meta.data_testo,
       sfondo: z.meta.sfondo || null,
       firma: opz.firma || null,
-      punti: z.punti, punti_ai: z.punti_ai || null,
+      punti: z.punti, punti_ai: L.haAI(z) ? z.punti_ai : null,   // griglia AI solo se allineata ai punti Maps
       fogli,
     };
   };

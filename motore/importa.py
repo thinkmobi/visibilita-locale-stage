@@ -150,7 +150,12 @@ def abbina(nome, indice, punto=None):
     (parole intere, almeno 8 caratteri e metà del nome), poi parole in comune (almeno il 60%); un abbinamento ambiguo non vale."""
     k = _norm(nome)
     if not k: return None
-    if k in indice["esatto"]: return indice["esatto"][k]
+    if k in indice["esatto"]:
+        # stesso nome in più sedi: si sceglie la più vicina al punto, come per i marchi
+        tutti = indice.get("omonimi", {}).get(k) or [indice["esatto"][k]]
+        pos = indice.get("pos") or {}
+        vicine = [(math.hypot(pos[c][0] - punto[0], (pos[c][1] - punto[1]) * .707), c) for c in tutti if punto and pos.get(c)]
+        return min(vicine)[1] if len(tutti) > 1 and vicine else indice["esatto"][k]
     # AI Mode cita spesso il marchio ("Torino Case", "Toscano"): vale se la frase intera compare in un solo nome Maps
     f = _frase(nome)
     generiche = {"agenzia", "agenzie", "immobiliare", "immobiliari", "studio", "scuola", "centro", "istituto", "torino", "di", "e",
@@ -179,11 +184,11 @@ def abbina(nome, indice, punto=None):
 def punti_ai_da_report(d, z, avvisi=None):
     """griglia AI Mode della stessa zona: [lat, lng, [place_id Maps o "~nome" se non abbinato]] in ordine di posizione.
     La scansione AI deve avere la stessa griglia della scansione Maps, altrimenti il confronto punto per punto non regge."""
-    indice = {"esatto": {}, "frasi": [], "pos": {}}
+    indice = {"esatto": {}, "frasi": [], "pos": {}, "omonimi": {}}
     for pid, a in (z.get("attivita") or {}).items():
         if a.get("la") is not None and a.get("lo") is not None: indice["pos"][pid] = (a["la"], a["lo"])
         k = _norm(a.get("n"))   # solo il nome completo: i nomi brevi automatici ("Istituto") abbinerebbero a caso
-        if k: indice["esatto"].setdefault(k, pid)
+        if k: indice["esatto"].setdefault(k, pid); indice["omonimi"].setdefault(k, []).append(pid)
         indice["frasi"].append((_frase(a.get("n")), pid))
     pm = z.get("punti") or []
     pa, non_abbinati = [], set()

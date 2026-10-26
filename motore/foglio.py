@@ -94,7 +94,7 @@ def testi(job, f, mm_, ma, debole):
         titolo = f"Su Google Maps e su Google AI Mode, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti"
     elif fuori:
         titolo = f"{dove}, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti. "
-        titolo += f"{altrove} succede in {rosso(altro_fuori)}." if altro_fuori else f"{altrove} siete tra i primi 3 ovunque."
+        titolo += f"{altrove} succede in {rosso(f'{zone(altro_fuori)} su {N}')}." if altro_fuori else f"{altrove} siete tra i primi 3 ovunque."
     else:
         titolo = f"Su Google Maps e su Google AI Mode siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
     sub = f"Tra i primi 3: su Google Maps in {a} zone su {N} ({pc(a, N)}), su Google AI Mode in {b} ({pc(b, N)})."
