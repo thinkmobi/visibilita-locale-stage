@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.29.4';
+const VERSIONE = '0.29.5';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -1332,7 +1332,7 @@ function vAltro() {
   <div class="eb">Dati</div>
   <div class="row"><button class="btn" id="bkp">Scarica backup completo</button><button class="btn" id="csvAll">Esporta CSV (Excel)</button><button class="btn" id="aggiorna">Riscarica da GitHub</button></div>
   <p class="sub mt"><span class="amb amb-${AMBIENTE}">${AMB_NOME}</span> Versione v${VERSIONE} · dati ${esc((c.owner || '…') + '/' + (c.repo || '…'))}. I dati restano nel repository privato e in questo dispositivo; il token è salvato solo qui. Su un telefono perso: revoca il token da GitHub → Settings → Developer settings.</p>
-  ${AMBIENTE === 'stage' ? `<p class="sub mt mono" id="diagFin">${esc(diagFinestra())}</p>` : ''}
+  <p class="sub mt mono" id="diagFin">${esc(diagFinestra())}</p>
   <button class="btn mini" id="esci" style="color:var(--neg)">Scollega e cancella i dati da questo dispositivo</button>`;
 }
 async function preparaRepo(out) {
@@ -1472,9 +1472,10 @@ function margineAlto() {
 function altezzaGiusta() {
   const h = window.innerHeight;
   if (!IPHONE_APP) return h;
-  // in verticale con la barra di stato «default» la finestra parte SOTTO la barra di stato (margine alto 0):
-  // lì innerHeight più corto dello schermo è giusto, e allungare il corpo spinge la barra delle schede fuori dallo schermo
-  if (window.innerWidth <= h && margineAlto() === 0) return h;
+  // 27/10/2026: allungare il corpo all'altezza dello schermo spinge la barra delle schede fuori dallo schermo
+  // su alcuni iPhone (verticale, app da Home). Una barra un po' sollevata è un difetto estetico, una barra fuori
+  // schermo blocca l'app: si usa sempre l'altezza reale della finestra.
+  return h;
   const orizz = window.innerWidth > h;
   const schermo = orizz ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
   const att = document.activeElement;
