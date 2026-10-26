@@ -12,7 +12,8 @@ test('posizioni in cifre con articolo giusto', () => {
   assert.equal(L.alPosto(6), 'al 6° posto');
   assert.equal(L.alPosto(8), "all'8° posto");
   assert.equal(L.alPosto(11), "all'11° posto");
-  assert.equal(L.alPosto(18), "all'18° posto");
+  assert.equal(L.alPosto(18), 'al 18° posto');
+  assert.equal(L.alPosto(8), "all'8° posto");
   assert.equal(L.alPostoBreve(3), 'al 3°');
   assert.equal(L.alPostoBreve(80), "all'80°");
 });
