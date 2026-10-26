@@ -93,6 +93,14 @@ test('3. sette viste: Tabella solo da 900 px, nessun overflow orizzontale a 390 
     await d.page.waitForSelector('#vista table');
     assert.match(await testoVista(d.page), /Agenzia Alfa/);
   } finally { await d.chiudi(); }
+  // telefono in orizzontale (932 px, touch): stessa barra della verticale, niente Tabella
+  const o2 = await apri();
+  try {
+    await o2.page.setViewportSize({ width: 932, height: 430 });
+    await attendiStato(o2.page, /Aggiornato/);
+    assert.equal(await o2.page.locator('.tab a[data-t=tabella]').isVisible(), false, 'Tabella visibile sul telefono in orizzontale');
+    assert.equal(await o2.page.locator('.tab a').evaluateAll((a) => a.filter((x) => x.offsetParent).length), 6);
+  } finally { await o2.chiudi(); }
 });
 
 test('4. scheda prospect: barra «Chiudi»/«Annulla», salvataggio con sha corretto e «✓ Salvato alle HH:MM»', async () => {

@@ -201,7 +201,8 @@ select.ora{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
 /* tabella (computer) */
 .solo-desk{display:none!important}
-@media (min-width:900px){.solo-desk{display:flex!important}}
+/* Tabella solo su computer: da 900 px e con mouse o trackpad. Il telefono in orizzontale (anche oltre 900 px) tiene la stessa barra della verticale */
+@media (min-width:900px) and (hover:hover) and (pointer:fine){.solo-desk{display:flex!important}}
 body.largo .vista{padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
 .kpi-t{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
 .t-filtri{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
