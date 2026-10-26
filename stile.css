@@ -37,7 +37,9 @@ body{display:flex;flex-direction:column;position:fixed;top:0;right:0;bottom:0;le
 .vista{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;background:var(--bg);
   padding:14px max(16px,env(safe-area-inset-right),calc((100% - 728px)/2)) 24px max(16px,env(safe-area-inset-left),calc((100% - 728px)/2))}
 .tab{position:relative;flex:none;z-index:5;display:flex;background:#fff;border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
-.tab a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0 6px;font-size:11px;text-decoration:none;color:var(--mute)}
+.tab a{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:11px 0 10px;font-size:11px;text-decoration:none;color:var(--mute)}
+/* barra solo icone: il nome della scheda resta per lettori di schermo e tooltip */
+.tab .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .tab a.on{color:var(--top);font-weight:600;font-display:swap}
 .eb{font-family:PlexMono;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute);display:flex;align-items:center;gap:8px;margin:18px 0 8px}

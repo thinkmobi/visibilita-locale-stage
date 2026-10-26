@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png?v=3">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
-<link rel="stylesheet" href="stile.css?v=0.29.1">
+<link rel="stylesheet" href="stile.css?v=0.29.2">
 </head>
 <body>
 <!-- splash di avvio: logo AGENTICA (negativo, dal design system AGENTICA) su inchiostro; non blocca i tocchi -->
@@ -24,17 +24,17 @@
 </header>
 <main id="vista" class="vista"></main>
 <nav class="tab">
-  <a href="#oggi" data-t="oggi"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Oggi</a>
-  <a href="#prospect" data-t="prospect"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.6.8 2.7 2.5 3 5.2"/></svg>Prospect</a>
-  <a href="#giro" data-t="giro"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>Giro</a>
-  <a href="#zone" data-t="zone"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><circle cx="8.5" cy="8.5" r="1.2"/><circle cx="15.5" cy="8.5" r="1.2"/><circle cx="8.5" cy="15.5" r="1.2"/><circle cx="15.5" cy="15.5" r="1.2"/></svg>Zone</a>
-  <a href="#cruscotto" data-t="cruscotto"><svg viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M22 20H2"/></svg>Numeri</a>
-  <a href="#tabella" data-t="tabella" class="solo-desk"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="1.5"/><path d="M3 9.5h18M3 14.5h18M9 4.5v15"/></svg>Tabella</a>
-  <a href="#altro" data-t="altro"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c1.1-4 4-6 7.5-6s6.4 2 7.5 6"/></svg>Profilo</a>
+  <a href="#oggi" data-t="oggi" aria-label="Oggi" title="Oggi"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="vh">Oggi</span></a>
+  <a href="#prospect" data-t="prospect" aria-label="Prospect" title="Prospect"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.6.8 2.7 2.5 3 5.2"/></svg><span class="vh">Prospect</span></a>
+  <a href="#giro" data-t="giro" aria-label="Giro" title="Giro"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg><span class="vh">Giro</span></a>
+  <a href="#zone" data-t="zone" aria-label="Zone" title="Zone"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><circle cx="8.5" cy="8.5" r="1.2"/><circle cx="15.5" cy="8.5" r="1.2"/><circle cx="8.5" cy="15.5" r="1.2"/><circle cx="15.5" cy="15.5" r="1.2"/></svg><span class="vh">Zone</span></a>
+  <a href="#cruscotto" data-t="cruscotto" aria-label="Numeri" title="Numeri"><svg viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M22 20H2"/></svg><span class="vh">Numeri</span></a>
+  <a href="#tabella" data-t="tabella" class="solo-desk" aria-label="Tabella" title="Tabella"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="1.5"/><path d="M3 9.5h18M3 14.5h18M9 4.5v15"/></svg><span class="vh">Tabella</span></a>
+  <a href="#altro" data-t="altro" aria-label="Profilo" title="Profilo"><svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5c1.1-4 4-6 7.5-6s6.4 2 7.5 6"/></svg><span class="vh">Profilo</span></a>
 </nav>
 <div id="foglio" class="foglio" hidden></div>
 <div id="toast" class="toast" hidden></div>
-<script src="logica.js?v=0.29.1"></script>
-<script src="app.js?v=0.29.1"></script>
+<script src="logica.js?v=0.29.2"></script>
+<script src="app.js?v=0.29.2"></script>
 </body>
 </html>
