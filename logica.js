@@ -155,7 +155,9 @@
   L.nomeFile = (z, data) => {
     const d = (data || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date())).replace(/-/g, '').slice(2);
     const q = (z.meta.quartiere || '').replace(/[^\p{L}\p{N}]+/gu, '');
-    return `${d}-${z.meta.categoria || 'Analisi'}-${q}`;
+    // categoria scritta a mano con spazi («Negozi di capsule e cialde») → NegoziDiCapsuleECialde, come le altre
+    const cat = (z.meta.categoria || 'Analisi').split(/[^\p{L}\p{N}]+/u).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join('');
+    return `${d}-${cat}-${q}`;
   };
 
   /* contenuto di zone/<id>/stampa.json: tutto ciò che serve al motore, nell'ordine del giro */

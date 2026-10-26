@@ -314,6 +314,8 @@ function avvisoAmbiente() {
 }
 function render() {
   const [vista, a, b] = (location.hash.slice(1) || 'oggi').split('/');
+  // indirizzo sconosciuto (vecchio segnalibro, errore di battitura): si torna a Oggi invece di lasciare la vista precedente
+  if (!VISTE[vista] && vista !== 'p' && vista !== 'z') { location.replace('#oggi'); return; }
   document.querySelectorAll('.tab a').forEach((x) => x.classList.toggle('on', x.dataset.t === vista));
   document.body.classList.toggle('largo', vista === 'tabella');
   $('#titolo').textContent = TITOLI[vista] || 'Visibilità';
