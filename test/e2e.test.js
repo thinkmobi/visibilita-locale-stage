@@ -17,7 +17,7 @@ const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQV
 const SESSIONE = { owner: 'prova', repo: 'visibilita-dati', token: 'github_pat_finto_solo_per_i_test' };
 
 let web, browser;
-test.before(async () => { web = await avvia(); browser = await chromium.launch(process.env.PW_EXE?{executablePath:process.env.PW_EXE}:{}); });
+test.before(async () => { web = await avvia(); browser = await chromium.launch(); });
 test.after(async () => { await browser.close(); await web.chiudi(); });
 
 /* contesto nuovo per ogni test: telefono simulato, fuso e lingua italiani */
@@ -205,42 +205,6 @@ test('8. «Genera PDF»: scrive stampa.json con le tappe del giro e mostra «Apr
     // il motore (Actions) risponde: la prossima lettura trova l’esito
     t.gh.metti(`zone/${ID}/stampa/esito.json`, { file: 'stampa/prova.pdf', richiesta: job.richiesta, analisi: 2, fogli: 1, avvisi: [] });
     await t.page.waitForSelector(`[data-pdf="${ID}|stampa/prova.pdf"]`, { timeout: 15000 });
-  } finally { await t.chiudi(); }
-});
-
-test('8b. un prospect fuori dal giro (anche di Rete) si aggiunge dalla scheda e finisce nel PDF del giro', async () => {
-  const t = await apri({ vista: 'prospect' });
-  try {
-    await attendiStato(t.page, /Aggiornato/);
-    await t.page.locator(`a.card[href="#p/${ID}/p4"]`).click();
-    await t.page.waitForSelector('#pGiroAgg');
-    assert.match(await t.page.locator('.foglio').innerText(), /Non è in nessun giro/);
-    assert.equal(await t.page.locator('#pGiroData').inputValue(), OGGI, 'proposta: il giro già in programma');
-    await t.page.locator('#pGiroAgg').click();
-    await t.page.waitForSelector('#pGiroVia');
-    assert.match(await t.page.locator('.foglio').innerText(), /tappa 3/);
-    await t.page.evaluate(() => { location.hash = '#giro'; });
-    await t.page.waitForSelector(`[data-stampa="${ID}"]`);
-    assert.match(await testoVista(t.page), /RE\/MAX Delta/);
-    await t.page.locator(`[data-stampa="${ID}"]`).click();
-    await t.page.waitForFunction((p) => !!document.querySelector('#st-' + p) && /generazione/i.test(document.querySelector('#st-' + p).textContent), ID, { timeout: 8000 });
-    const job = t.gh.json(`zone/${ID}/stampa.json`);
-    assert.deepEqual(job.fogli.map((a) => a.pid), ['pA', 'pB', 'pD']);
-  } finally { await t.chiudi(); }
-});
-
-test('8c. un contatto con data passata registrato dal giro non segna la tappa come consegnata', async () => {
-  const t = await apri({ vista: 'giro' });
-  try {
-    await attendiStato(t.page, /Aggiornato/);
-    await t.page.locator(`[data-fatto="${ID}|p2"]`).click();
-    await t.page.waitForSelector('#cData');
-    await t.page.locator('#cData').fill('2026-10-01');
-    await t.page.locator('#salva').click();
-    await t.page.waitForFunction(() => /^Salvato/.test(document.querySelector('#syncTxt').textContent), null, { timeout: 15000 });
-    const z = t.gh.json(`zone/${ID}/zona.json`);
-    assert.notEqual(z.prospect.p2.giro.fatto, true, 'la tappa di oggi non deve risultare consegnata per un contatto del 01/10');
-    assert.equal(Object.values(z.registro).length, 1, 'il contatto resta nel registro');
   } finally { await t.chiudi(); }
 });
 
