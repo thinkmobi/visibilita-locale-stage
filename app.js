@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.28.0';
+const VERSIONE = '0.24.1';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -288,6 +288,12 @@ const registro = (zid, pid) => Object.values(ST.zone[zid].z.registro || {}).filt
 // contatti di prospect ancora presenti (quelli di prospect eliminati non entrano nei conteggi)
 const registroVivo = () => Object.values(ST.zone).flatMap((s) => Object.values(s.z.registro || {}).filter((r) => !r.del && s.z.prospect[r.p] && !s.z.prospect[r.p].del));
 const ultimoContatto = (zid, pid) => (registro(zid, pid)[0] || {}).data || '';
+/* data proposta per aggiungere un prospect a un giro: quella aperta nella vista Giro, altrimenti il prossimo giro in programma, altrimenti oggi */
+function dataGiroProposta() {
+  const og = oggi();
+  if (ST.giroData && ST.giroData >= og) return ST.giroData;
+  return tutti().filter((x) => x.p.giro && x.p.giro.data && x.p.giro.data >= og).map((x) => x.p.giro.data).sort()[0] || og;
+}
 function aggiorna(zid, pid, campi) { const p = ST.zone[zid].z.prospect[pid]; Object.assign(p, campi); tocca(p, ...Object.keys(campi)); modificato(zid); }
 function urgenza(p) { if (!aperto(p) || !p.data_prossima) return null; return giorni(p.data_prossima); }
 // linea a sinistra = quanto è caldo il prospect, con i colori della legenda priorità (1 Caldo, 2 Tiepido, 0 Invisibile, 3 Rete)
@@ -571,6 +577,11 @@ function apriProspect(zid, id, opz = {}) {
   ${reg.map((r) => `<div class="reg"><div class="riga"><b>${esc(r.esito || r.canale)}</b><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}</span></div>
      ${r.interlocutore ? `<div class="sub">con ${esc(r.interlocutore)}</div>` : ''}${r.emerso ? `<div>${esc(r.emerso)}</div>` : ''}${r.prossima ? `<div class="sub">→ ${esc(r.prossima)} ${r.entro ? 'entro ' + esc(gg(r.entro)) : ''}</div>` : ''}
      <div class="reg-az"><button class="btn mini" data-rmod="${esc(r.id)}">Modifica</button><button class="btn mini neg-t" data-rdel="${esc(r.id)}">Elimina</button></div></div>`).join('') || '<div class="sub">Nessun contatto registrato.</div>'}
+  <div class="eb">Giro</div>
+  ${p.giro && p.giro.data
+    ? `<div class="riga"><span>Nel giro del <b>${esc(ggLungo(p.giro.data))}</b> · tappa ${p.giro.ordine || '—'}${p.giro.fatto ? ' · <span class="stato-tappa consegnata">✓ Consegnato</span>' : ''}</span><button class="btn mini" id="pGiroVia">Togli dal giro</button></div>`
+    : `<div class="avviso">Non è in nessun giro: il PDF del giro stampa solo le tappe del giro.</div>
+  <div class="riga mt"><input type="date" id="pGiroData" value="${esc(dataGiroProposta())}" style="width:auto"><button class="btn mini" id="pGiroAgg">Aggiungi al giro</button></div>`}
   ${an ? `<label class="f mt"><input type="checkbox" data-r="includi" ${p.report && p.report.includi === false ? '' : 'checked'} style="display:inline;width:auto;margin-right:6px">Includi nel PDF del giro</label>
   ` : ''}
   <div class="eb">Dati</div>
@@ -613,6 +624,17 @@ function apriProspect(zid, id, opz = {}) {
   f.querySelectorAll('[data-r]').forEach((el) => el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
     DR[el.dataset.r] = el.type === 'checkbox' ? el.checked : el.value; segna();
   }));
+  const gAgg = $('#pGiroAgg', f); if (gAgg) gAgg.onclick = () => {
+    const d = $('#pGiroData', f).value; if (!d) { toast('Scegli la data del giro'); return; }
+    if (salva() === false) return;
+    const campi = { giro: { data: d, ordine: prossimoOrdine(zid, d), orario: '', fatto: false } };
+    if (p.report && p.report.includi === false) campi.report = { ...p.report, includi: true };   // aggiunto al giro per stamparlo
+    aggiorna(zid, id, campi); apriProspect(zid, id, { salvato: 'Aggiunto al giro del ' + gg(d) });
+  };
+  const gVia = $('#pGiroVia', f); if (gVia) gVia.onclick = () => {
+    if (salva() === false) return;
+    const d = p.giro.data; aggiorna(zid, id, { giro: {} }); rinumera(zid, d); modificato(zid); apriProspect(zid, id, { salvato: 'Tolto dal giro del ' + gg(d) });
+  };
   f.querySelectorAll('[data-pg]').forEach((el) => (el.onclick = () => {
     const v = (D.pg ?? p.pg) === el.dataset.pg ? '' : el.dataset.pg;   // secondo tocco: torna da verificare
     D.pg = v; f.querySelectorAll('[data-pg]').forEach((b) => b.classList.toggle('on', b.dataset.pg === v)); segna();
@@ -722,7 +744,8 @@ function formContatto(zid, id, preset = {}) {
       } else { const rid = uid(); z.registro[rid] = { id: rid, ...voce, u: ora() }; }
       const campi = { stato: v.stato, prossima: CHIUSI.includes(v.stato) ? '' : v.prossima, data_prossima: CHIUSI.includes(v.stato) ? '' : v.entro };
       if (v.interlocutore && !p.referente) campi.referente = maiuscole(v.interlocutore, true);
-      if (preset.giro) campi.giro = { ...p.giro, fatto: true, fatto_il: v.data };
+      // la tappa è consegnata solo se il contatto è del giorno del giro o successivo: un contatto passato registrato dal giro non la chiude
+      if (preset.giro && p.giro && p.giro.data && v.data >= p.giro.data) campi.giro = { ...p.giro, fatto: true, fatto_il: v.data };
       aggiorna(zid, id, campi);
       if (preset.ritorno) { toast('✓ Contatto salvato alle ' + oraAdesso()); location.hash = preset.ritorno; chiudiFoglio(); render(); } else apriProspect(zid, id, { salvato: rm ? 'Contatto corretto' : 'Contatto salvato' });
     };
