@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.24.0';
+const VERSIONE = '0.25.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';

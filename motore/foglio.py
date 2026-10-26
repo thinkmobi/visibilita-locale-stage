@@ -101,13 +101,13 @@ def testi(job, f, mm_, ma, debole):
     altrove = "Su Google Maps" if debole == "ai" else "Su Google AI Mode"
     # il titolo parte dalla piattaforma più debole e cita sempre anche l'altra
     if fuori and fuori == altro_fuori:
-        titolo = f"Su Google Maps e su Google AI Mode, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti"
+        titolo = f"Su Google AI Mode e su Google Maps, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti"
     elif fuori:
         titolo = f"{dove}, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti. "
         titolo += f"{altrove} succede in {rosso(f'{zone(altro_fuori)} su {N}')}." if altro_fuori else f"{altrove} siete tra i primi 3 ovunque."
     else:
-        titolo = f"Su Google Maps e su Google AI Mode siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
-    sub = f"Tra i primi 3: su Google Maps in {a} zone su {N} ({pc(a, N)}), su Google AI Mode in {b} ({pc(b, N)})."
+        titolo = f"Su Google AI Mode e su Google Maps siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
+    sub = f"Tra i primi 3: su Google AI Mode in {b} zone su {N} ({pc(b, N)}), su Google Maps in {a} ({pc(a, N)})."
     lettura = "Ogni pallino è una zona: il numero è la vostra posizione su Google da quel punto. Il quadratino nero è la vostra sede."
     # quota di zone tra i primi 3 sulla piattaforma debole: si vede subito quanto poco compare
     rischio = presenza(dentro, N, "Google AI Mode" if debole == "ai" else "Google Maps")
@@ -239,8 +239,8 @@ def pagina(c, job, f, bg, firma):
         c.setStrokeColor(LINE); c.setLineWidth(.5); c.line(x, y - head_h + .6 * mm, x + w, y - head_h + .6 * mm)
     if pai:
         for i, (lab, sub, pts, rk, m) in enumerate([
-                ("Google Maps", "la mappa di Google", punti, rkm, mm_),
-                ("Google AI Mode", "le risposte dell’intelligenza artificiale", pai, rka, ma)]):
+                ("Google AI Mode", "le risposte dell’intelligenza artificiale", pai, rka, ma),
+                ("Google Maps", "la mappa di Google", punti, rkm, mm_)]):   # prima AI Mode, poi Maps
             x = xm + i * (S + gap)
             testata(x, lab, sub, S)
             my = y - head_h - 1.6 * mm - S

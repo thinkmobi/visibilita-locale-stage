@@ -193,7 +193,7 @@
       tipo: 'fogli',
       richiesta: opz.richiesta || String(Date.now()),
       file: opz.file || L.nomeFile(z, opz.data) + nomeAtt,
-      titolo_pdf: `Visibilità su Google Maps e AI Mode · ${z.meta.quartiere}`,
+      titolo_pdf: `Visibilità su Google AI Mode e Maps · ${z.meta.quartiere}`,
       keyword: z.meta.keyword, frase_kw: z.meta.frase_kw, centrata: z.meta.centrata, lato: z.meta.lato, data_testo: z.meta.data_testo,
       sfondo: z.meta.sfondo || null,
       firma: opz.firma || null,
