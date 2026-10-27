@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.29.5';
+const VERSIONE = '0.29.6';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -1469,24 +1469,29 @@ function margineAlto() {
   const p = document.createElement('div'); p.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px)';
   document.body.appendChild(p); const v = parseFloat(getComputedStyle(p).paddingTop) || 0; p.remove(); return v;
 }
+/* Bug di iOS (app aperta dalla Home): dopo la tastiera, e a volte all'avvio, innerHeight resta ~60 px più corto
+   della finestra vera finché non si ruota il telefono, e sotto la barra delle schede resta una fascia bianca.
+   L'altezza dello schermo non va bene come riferimento: in verticale la finestra parte sotto la barra di stato ed è
+   legittimamente più corta (allungarla spinge la barra fuori schermo, 26-27/10/2026).
+   Rimedio: per ogni orientamento si ricorda l'altezza più grande vista senza tastiera (anche tra un'apertura e l'altra)
+   e si usa quella quando iOS ne dichiara una più corta. Mai oltre lo schermo. */
+const CHIAVE_ALT = 'vl-alt' + SUFF;
+let ALT = {}; try { ALT = JSON.parse(localStorage.getItem(CHIAVE_ALT) || '{}') || {}; } catch (e) { ALT = {}; }
 function altezzaGiusta() {
   const h = window.innerHeight;
   if (!IPHONE_APP) return h;
-  // 27/10/2026: allungare il corpo all'altezza dello schermo spinge la barra delle schede fuori dallo schermo
-  // su alcuni iPhone (verticale, app da Home). Una barra un po' sollevata è un difetto estetico, una barra fuori
-  // schermo blocca l'app: si usa sempre l'altezza reale della finestra.
-  return h;
   const orizz = window.innerWidth > h;
-  const schermo = orizz ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
   const att = document.activeElement;
-  const tastiera = att && /^(INPUT|TEXTAREA|SELECT)$/.test(att.tagName);
-  // solo uno scarto "da bug" (fino a ~140 px) e senza tastiera aperta; oltre è la tastiera o altro, si lascia fare a iOS
-  return !tastiera && schermo > h && schermo - h <= 140 ? schermo : h;
+  if (att && /^(INPUT|TEXTAREA|SELECT)$/.test(att.tagName)) return h;   // tastiera aperta: decide iOS
+  const k = (orizz ? 'o' : 'v') + Math.min(screen.width, screen.height) + 'x' + Math.max(screen.width, screen.height);
+  const schermo = orizz ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+  if (h <= schermo && h > (ALT[k] || 0)) { ALT[k] = h; try { localStorage.setItem(CHIAVE_ALT, JSON.stringify(ALT)); } catch (e) { /* */ } }
+  const buona = Math.min(ALT[k] || h, schermo);
+  return buona - h > 0 && buona - h <= 140 ? buona : h;
 }
-/* diagnostica della finestra (solo stage): serve a capire problemi di altezza su iPhone dagli screenshot */
 function diagFinestra() {
   const t = document.querySelector('.tab'); const tb = t ? Math.round(t.getBoundingClientRect().bottom) : '?';
-  return `finestra ${innerWidth}×${innerHeight} · schermo ${screen.width}×${screen.height} · margine alto ${margineAlto()} · corpo ${Math.round(document.body.getBoundingClientRect().height)} · fondo barra ${tb} · app ${IPHONE_APP ? 'sì' : 'no'}`;
+  return `finestra ${innerWidth}×${innerHeight} · schermo ${screen.width}×${screen.height} · margine alto ${margineAlto()} · corpo ${Math.round(document.body.getBoundingClientRect().height)} · fondo barra ${tb} · app ${IPHONE_APP ? 'sì' : 'no'} · memoria ${JSON.stringify(ALT)}`;
 }
 function adattaAltezza() {
   const b = document.body; if (!b) return;
