@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.29.6';
+const VERSIONE = '0.29.7';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -1475,19 +1475,29 @@ function margineAlto() {
    legittimamente più corta (allungarla spinge la barra fuori schermo, 26-27/10/2026).
    Rimedio: per ogni orientamento si ricorda l'altezza più grande vista senza tastiera (anche tra un'apertura e l'altra)
    e si usa quella quando iOS ne dichiara una più corta. Mai oltre lo schermo. */
-const CHIAVE_ALT = 'vl-alt' + SUFF;
+const CHIAVE_ALT = 'vl-alt2' + SUFF;   // 27/10: chiave nuova, la memoria della 0.29.6 poteva contenere un valore sbagliato preso durante la rotazione
 let ALT = {}; try { ALT = JSON.parse(localStorage.getItem(CHIAVE_ALT) || '{}') || {}; } catch (e) { ALT = {}; }
+let ULTIMA_ROT = 0;   // durante e subito dopo una rotazione iOS riporta altezze provvisorie (anche quella dell'altro orientamento)
+const chiaveOr = () => { const orizz = window.innerWidth > window.innerHeight; return (orizz ? 'o' : 'v') + Math.min(screen.width, screen.height) + 'x' + Math.max(screen.width, screen.height); };
+const tastieraAperta = () => { const a = document.activeElement; return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
 function altezzaGiusta() {
   const h = window.innerHeight;
-  if (!IPHONE_APP) return h;
+  if (!IPHONE_APP || tastieraAperta() || Date.now() - ULTIMA_ROT < 2000) return h;
   const orizz = window.innerWidth > h;
-  const att = document.activeElement;
-  if (att && /^(INPUT|TEXTAREA|SELECT)$/.test(att.tagName)) return h;   // tastiera aperta: decide iOS
-  const k = (orizz ? 'o' : 'v') + Math.min(screen.width, screen.height) + 'x' + Math.max(screen.width, screen.height);
   const schermo = orizz ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
-  if (h <= schermo && h > (ALT[k] || 0)) { ALT[k] = h; try { localStorage.setItem(CHIAVE_ALT, JSON.stringify(ALT)); } catch (e) { /* */ } }
-  const buona = Math.min(ALT[k] || h, schermo);
+  const buona = Math.min(ALT[chiaveOr()] || h, schermo);
   return buona - h > 0 && buona - h <= 140 ? buona : h;
+}
+/* impara l'altezza buona solo da letture stabili: due misure uguali a 700 ms, senza tastiera e lontano da una rotazione */
+function imparaAltezza() {
+  if (!IPHONE_APP) return;
+  const k = chiaveOr(), h1 = window.innerHeight, w1 = window.innerWidth;
+  setTimeout(() => {
+    if (tastieraAperta() || Date.now() - ULTIMA_ROT < 2000) return;
+    if (window.innerHeight !== h1 || window.innerWidth !== w1 || chiaveOr() !== k) return;
+    if (h1 > (ALT[k] || 0)) { ALT[k] = h1; try { localStorage.setItem(CHIAVE_ALT, JSON.stringify(ALT)); } catch (e) { /* */ } }
+    adattaAltezza();
+  }, 700);
 }
 function diagFinestra() {
   const t = document.querySelector('.tab'); const tb = t ? Math.round(t.getBoundingClientRect().bottom) : '?';
@@ -1505,7 +1515,13 @@ function ricalcolaFinestra() {
   if (v) v.scrollTop = pos;
   adattaAltezza();
 }
-['resize', 'orientationchange'].forEach((ev) => window.addEventListener(ev, () => { adattaAltezza(); setTimeout(adattaAltezza, 350); }));
+let ORIZZ = window.innerWidth > window.innerHeight;
+['resize', 'orientationchange'].forEach((ev) => window.addEventListener(ev, () => {
+  const orizz = window.innerWidth > window.innerHeight;
+  if (ev === 'orientationchange' || orizz !== ORIZZ) { ULTIMA_ROT = Date.now(); ORIZZ = orizz; document.body.style.height = ''; }   // in rotazione: altezza naturale
+  adattaAltezza(); setTimeout(adattaAltezza, 350); setTimeout(() => { adattaAltezza(); imparaAltezza(); }, 2300);
+}));
+window.addEventListener('load', () => setTimeout(imparaAltezza, 800));
 window.addEventListener('pageshow', () => setTimeout(ricalcolaFinestra, 50));
 document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(ricalcolaFinestra, 200); });
 // iPhone tiene l'app in memoria per giorni: dopo 30 minuti in background il giro riparte da oggi
