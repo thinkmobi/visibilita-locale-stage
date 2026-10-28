@@ -141,14 +141,14 @@ test('colorePct, recStr, indirizzoBreve', () => {
   assert.equal(L.indirizzoBreve('', 'Torino'), 'Torino');
 });
 
-test('nomeFile: data AAMMGG, categoria e quartiere senza spazi', () => {
-  assert.equal(L.nomeFile(z, '2026-10-23'), '261023-AgenziaImmobiliare-Crocetta');
+test('nomeFile: data AAAAMMGG, categoria e quartiere senza spazi', () => {
+  assert.equal(L.nomeFile(z, '2026-10-23'), '20261023-AgenziaImmobiliare-Crocetta');
 });
 
 test('jobStampa: struttura attesa da motore/report.py', () => {
   const job = L.jobStampa(z, [P.p1, P.p2], { data: '2026-10-23', richiesta: 'r1' });
   assert.equal(job.richiesta, 'r1');
-  assert.equal(job.file, '261023-AgenziaImmobiliare-Crocetta');
+  assert.equal(job.file, '20261023-AgenziaImmobiliare-Crocetta');
   assert.equal(job.punti.length, 9);
   assert.equal(job.analisi.length, 2);
   assert.equal(job.lat_centro, 45.06);
@@ -166,7 +166,7 @@ test('jobFogli: tipo, nome file per una o più attività, griglia AI', () => {
   assert.equal(L.haAI(z), true);
   const uno = L.jobFogli(z, [z.prospect.p1], { data: '2026-10-24' });
   assert.equal(uno.tipo, 'fogli');
-  assert.match(uno.file, /^261024-.+-.+-[^-]+$/);
+  assert.match(uno.file, /^20261024-.+-.+-[^-]+$/);
   assert.ok(!uno.file.endsWith('-Fogli'));
   const due = L.jobFogli(z, [z.prospect.p1, z.prospect.p2], { data: '2026-10-24' });
   assert.ok(due.file.endsWith('-Fogli'));
@@ -202,4 +202,12 @@ test('L.priorita: con AI Mode decide AI Mode, senza resta Maps', () => {
   assert.equal(L.priorita(z, pid).base, 'maps');
   assert.equal(N > 0, true);
   assert.match(L.gancio(conAI(() => 0, 5), pid), /^Google AI Mode non la cita/);
+});
+
+test('distanziaPin: i pin sovrapposti si separano, gli altri restano', () => {
+  const out = L.distanziaPin([{ x: 100, y: 100 }, { x: 104, y: 102 }, { x: 300, y: 300 }]);
+  assert.ok(Math.hypot(out[0].x - out[1].x, out[0].y - out[1].y) >= 28, 'i due pin vicini distano almeno la loro larghezza');
+  assert.deepEqual([out[2].x, out[2].y], [300, 300]);
+  const tre = L.distanziaPin([{ x: 50, y: 50 }, { x: 52, y: 50 }, { x: 50, y: 53 }]);
+  for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) assert.ok(Math.hypot(tre[i].x - tre[j].x, tre[i].y - tre[j].y) >= 28);
 });

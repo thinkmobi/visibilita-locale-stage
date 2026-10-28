@@ -104,17 +104,17 @@ def testi(job, f, mm_, ma, debole):
                   else f"Su Google Maps siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>")
         return {"titolo": titolo, "lettura": lettura, "fuori": fuori, "invito": invito, "dove": "Su Google Maps",
                 "rischio": presenza(a, N, "Google Maps")}
-    dentro = b if debole == "ai" else a
-    fuori = N - dentro
-    altro_fuori = N - (a if debole == "ai" else b)
+    # AI Mode sempre prima di Maps (regola del 26/10/2026, vale come nel modello Pianezza); `debole` resta per il resto del foglio
+    fuori_ai, fuori_maps = N - b, N - a
     dove = "Nelle risposte di Google AI Mode" if debole == "ai" else "Su Google Maps"
-    altrove = "Su Google Maps" if debole == "ai" else "Su Google AI Mode"
-    # il titolo parte dalla piattaforma più debole e cita sempre anche l'altra
-    if fuori and fuori == altro_fuori:
-        titolo = f"Su Google AI Mode e su Google Maps, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti"
-    elif fuori:
-        titolo = f"{dove}, in {rosso(f'{zone(fuori)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti. "
-        titolo += f"{altrove} succede in {rosso(f'{zone(altro_fuori)} su {N}')}." if altro_fuori else f"{altrove} siete tra i primi 3 ovunque."
+    fuori = fuori_ai if debole == "ai" else fuori_maps
+    if fuori_ai and fuori_ai == fuori_maps:
+        titolo = f"Su Google AI Mode e su Google Maps, in {rosso(f'{zone(fuori_ai)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti"
+    elif fuori_ai:
+        titolo = f"Nelle risposte di Google AI Mode, in {rosso(f'{zone(fuori_ai)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti. "
+        titolo += f"Su Google Maps succede in {rosso(f'{zone(fuori_maps)} su {N}')}." if fuori_maps else "Su Google Maps siete tra i primi 3 ovunque."
+    elif fuori_maps:
+        titolo = f"Nelle risposte di Google AI Mode siete tra i primi 3 ovunque. Su Google Maps, in {rosso(f'{zone(fuori_maps)} su {N}')} chi cerca {chi} trova prima i vostri concorrenti."
     else:
         titolo = f"Su Google AI Mode e su Google Maps siete tra i primi 3 in <font color='#1E8E3E'>tutte le {N} zone</font>"
     sub = f"Tra i primi 3: su Google AI Mode in {b} zone su {N} ({pc(b, N)}), su Google Maps in {a} ({pc(a, N)})."
@@ -150,6 +150,30 @@ def ring(c, cx, cy, r, rk, w):
     c.setFillColor(INK); c.setFont("MOB", r * .62); c.drawCentredString(cx, cy - r * .22, pc(parti[0][0], N))
 
 
+PAD_BASE = .203   # zone 2 x 2 km: i segnalini di Local Falcon cadono al 20,3% dal bordo e le dimensioni dei pallini sono tarate su questo
+
+
+def pad_sfondo(bg, n):
+    """distanza dal bordo (quota del lato) dei segnalini di Local Falcon nello sfondo: dipende dal raggio della zona
+    (zone 2 x 2 km 20,3%, 6 x 6 km 5,6%). Si legge dalla griglia dei segnalini; se non si riconosce, 20,3%."""
+    try:
+        from PIL import Image, ImageChops
+        im = Image.open(bg).convert("RGB"); W, H = im.size; hsv = im.convert("HSV")
+        mk = ImageChops.multiply(hsv.getchannel(1).point(lambda v: 255 if v > 140 else 0), hsv.getchannel(2).point(lambda v: 255 if v > 90 else 0))
+        def bande(dati, L):
+            g = []
+            for i, v in enumerate(dati):
+                if v > 25:
+                    if g and i - g[-1][-1] <= 2: g[-1].append(i)
+                    else: g.append([i])
+            return [(a[0] + a[-1]) / 2 / L for a in g if len(a) >= 12]
+        bx = bande(list(mk.resize((W, 1), Image.BOX).getdata()), W); by = bande(list(mk.resize((1, H), Image.BOX).getdata()), H)
+        if len(bx) == n and len(by) == n and abs(bx[0] - by[0]) < .01: return (bx[0] + by[0]) / 2
+    except Exception:
+        pass
+    return PAD_BASE
+
+
 def mappa(c, x, y, S, punti, rk, bg, sede):
     """griglia a pallini sullo sfondo della zona"""
     c.saveState(); pth = c.beginPath(); pth.roundRect(x, y, S, S, 1.6 * mm); c.clipPath(pth, stroke=0, fill=0)
@@ -161,10 +185,10 @@ def mappa(c, x, y, S, punti, rk, bg, sede):
     la0, la1, lo0, lo1 = min(lats), max(lats), min(lngs), max(lngs)
     if la1 - la0 < 1e-9: la0, la1 = la0 - .005, la1 + .005
     if lo1 - lo0 < 1e-9: lo0, lo1 = lo0 - .007, lo1 + .007
-    pad = S * (.203 if bg else .085)   # sullo sfondo Local Falcon i pallini cadono al 20,3% dal bordo (zone 7x7)
-    xy = lambda la, lo: (x + pad + (lo - lo0) / (lo1 - lo0) * (S - 2 * pad), y + pad + (la - la0) / (la1 - la0) * (S - 2 * pad))
     n = max(2, round(math.sqrt(len(punti))))
-    rr = (S - 2 * pad) / (n - 1) * .36
+    pad = S * (pad_sfondo(bg, n) if bg else .085)   # i pallini cadono sui segnalini di Local Falcon dello sfondo
+    xy = lambda la, lo: (x + pad + (lo - lo0) / (lo1 - lo0) * (S - 2 * pad), y + pad + (la - la0) / (la1 - la0) * (S - 2 * pad))
+    rr = (S - 2 * S * (PAD_BASE if bg else .085)) / (n - 1) * .36   # stessa dimensione dei pallini su ogni zona
     for i, (la, lo, _) in enumerate(punti):
         px, py = xy(la, lo); r = rk[i]; h = heat(r)
         c.setFillColor(R[h]); c.setStrokeColor(white); c.setLineWidth(.9); c.circle(px, py, rr, stroke=1, fill=1)
@@ -361,31 +385,16 @@ AVVISI_F = []
 
 
 def genera_fogli(job, cartella, out, firma):
-    """due fogli per pagina A4 verticale, uno per attività; restituisce gli avvisi"""
+    """un foglio per pagina, A4 orizzontale a grandezza piena (regola del 28/10/2026); restituisce gli avvisi"""
     AVVISI_F.clear()
     if job.get("punti_ai") and len(job["punti_ai"]) != len(job["punti"]):
         raise ValueError("le griglie Maps e AI Mode non hanno lo stesso numero di punti: rifai l'import della zona")
     bg = os.path.join(cartella, job["sfondo"]) if job.get("sfondo") else None
     if bg and not os.path.exists(bg): AVVISI_F.append("sfondo mappa non trovato: fogli senza mappa"); bg = None
-    # stampa verticale: due fogli per pagina A4, uno sopra l'altro, per dimezzare i costi di stampa.
-    # Ogni foglio è disegnato in A4 orizzontale e ridotto a metà pagina (fattore 1/√2: 297×210 mm → 210×148,5 mm)
-    PW, PH = A4
-    LW, LH = landscape(A4)
-    k = PW / LW
-    c = canvas.Canvas(out, pagesize=A4)
+    c = canvas.Canvas(out, pagesize=landscape(A4))
     c.setTitle(job.get("titolo_pdf", "Visibilità su Google")); c.setAuthor(firma["nome"] + " Consulente")
-    fogli = job["fogli"]
-    for i in range(0, len(fogli), 2):
-        for j, f in enumerate(fogli[i:i + 2]):
-            y0 = PH / 2 if j == 0 else PH / 2 - LH * k
-            c.saveState()
-            pth = c.beginPath(); pth.rect(0, y0, PW, LH * k); c.clipPath(pth, stroke=0, fill=0)
-            c.translate(0, y0); c.scale(k, k)
-            pagina(c, job, f, bg, firma)
-            c.restoreState()
-        if len(fogli) - i > 1:   # linea di taglio tra i due fogli
-            c.setStrokeColor(HexColor("#B8BCC2")); c.setLineWidth(.4); c.setDash(2, 2); c.line(4 * mm, PH / 2, PW - 4 * mm, PH / 2); c.setDash()
-            c.setFillColor(HexColor("#B8BCC2")); c.setFont("DJ", 6); c.drawString(4 * mm, PH / 2 + .8 * mm, "\u2702")
+    for f in job["fogli"]:
+        pagina(c, job, f, bg, firma)
         c.showPage()
     c.save()
     return list(AVVISI_F)

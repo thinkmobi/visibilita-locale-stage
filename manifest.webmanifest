@@ -1,6 +1,6 @@
 {
-  "name": "Visibilità locale",
-  "short_name": "Visibilità",
+  "name": "Visibilità STAGE",
+  "short_name": "Visibilità STAGE",
   "start_url": "./#oggi",
   "scope": "./",
   "display": "standalone",

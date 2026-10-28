@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.30.0';
+const VERSIONE = '0.31.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -155,6 +155,8 @@ const GH = {
   async getBlob(p) { const r = await GH.req(p, {}, 'application/vnd.github.raw+json'); return r && r.blob(); },
   async sha(p) { const r = await GH.req(p); return r ? (await r.json()).sha : null; },
   async put(p, b64, sha, msg) {
+    // l'app di stage scrive solo su un repository di prova (nome che finisce con -stage): mai sui dati veri
+    if (AMBIENTE === 'stage' && !/-stage$/.test(ST.cfg.repo)) throw new Error(`Stage: scrittura bloccata su ${ST.cfg.repo}. In Profilo imposta visibilita-dati-stage.`);
     const r = await GH.req(p, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg, content: b64, ...(sha ? { sha } : {}) }) });
     return (await r.json()).content.sha;
   },
@@ -784,11 +786,16 @@ async function disegnaMappaGiro() {
   L0.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
   const ordinati = pts;   // già in ordine di lista, numerati come la lista
   for (const zid of new Set(pts.map((p) => p.zid))) L0.polyline(pts.filter((p) => p.zid === zid).map((p) => [p.la, p.lo]), { color: '#18232A', weight: 2, opacity: .45, dashArray: '4 6' }).addTo(m);
+  const pin = [];
   for (const p of ordinati) {
     const icona = L0.divIcon({ className: '', html: `<span class="mg-pin ${p.ni ? 'ni' : p.rc ? 'rc' : p.fatto ? 'fatto' : p.rip ? 'rip' : p.vis ? 'vis' : ''}">${p.ni ? '✕' : p.fatto && !p.rc ? '✓' : esc(String(p.n || ''))}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] });
-    L0.marker([p.la, p.lo], { icon: icona, title: p.nome, keyboard: true }).addTo(m).on('click', () => { location.hash = `#p/${p.zid}/${p.id}`; });
+    pin.push({ p, mk: L0.marker([p.la, p.lo], { icon: icona, title: p.nome, keyboard: true }).addTo(m).on('click', () => { location.hash = `#p/${p.zid}/${p.id}`; }) });
   }
+  // tappe vicine: sullo schermo i pin si distanziano di pochi pixel (la posizione reale e il percorso tratteggiato restano quelli veri), così ogni numero si legge
+  const distanzia = () => { for (const o of L.distanziaPin(pin.map((x) => m.latLngToContainerPoint([x.p.la, x.p.lo])))) pin[o.i].mk.setLatLng(m.containerPointToLatLng(L0.point(o.x, o.y))); };
+  m.on('zoomend', distanzia);
   m.fitBounds(L0.latLngBounds(ordinati.map((p) => [p.la, p.lo])).pad(0.15), { maxZoom: 17 });
+  distanzia();
 }
 function vGiro() {
   const tt = tutti().filter((x) => x.p.giro && x.p.giro.data);

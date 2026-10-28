@@ -9,7 +9,7 @@ const TIPI = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 
 function avvia() {
   const srv = http.createServer((req, res) => {
-    const u = new URL(req.url, 'http://x'); let p = decodeURIComponent(u.pathname); if (p.endsWith('/')) p += 'index.html';
+    const u = new URL(req.url, 'http://x'); let p = decodeURIComponent(u.pathname).replace(/^\/[\w.-]*-stage\//, '/'); if (p.endsWith('/')) p += 'index.html';
     const f = path.join(RADICE, p);
     if (!f.startsWith(RADICE) || f.startsWith(path.join(RADICE, 'test')) || f.includes(`${path.sep}.git${path.sep}`) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('non trovato'); }
     res.writeHead(200, { 'content-type': TIPI[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' });

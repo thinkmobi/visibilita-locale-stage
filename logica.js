@@ -156,11 +156,27 @@
   };
 
   L.nomeFile = (z, data) => {
-    const d = (data || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date())).replace(/-/g, '').slice(2);
+    const d = (data || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date())).replace(/-/g, '');
     const q = (z.meta.quartiere || '').replace(/[^\p{L}\p{N}]+/gu, '');
     // categoria scritta a mano con spazi («Negozi di capsule e cialde») → NegoziDiCapsuleECialde, come le altre
     const cat = (z.meta.categoria || 'Analisi').split(/[^\p{L}\p{N}]+/u).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join('');
     return `${d}-${cat}-${q}`;
+  };
+
+  /* punti sullo schermo [{x, y}] → nuove posizioni [{i, x, y}] con i pin troppo vicini (meno di 26 px) disposti su un cerchio attorno al loro centro */
+  L.distanziaPin = (pt, soglia = 26) => {
+    const gruppo = pt.map((_, i) => i);
+    const radice = (i) => (gruppo[i] === i ? i : (gruppo[i] = radice(gruppo[i])));
+    for (let i = 0; i < pt.length; i++) for (let j = i + 1; j < pt.length; j++) if (Math.hypot(pt[i].x - pt[j].x, pt[i].y - pt[j].y) < soglia) gruppo[radice(j)] = radice(i);
+    const per = {}; pt.forEach((_, i) => (per[radice(i)] = per[radice(i)] || []).push(i));
+    const out = pt.map((q, i) => ({ i, x: q.x, y: q.y }));
+    for (const ids of Object.values(per)) {
+      if (ids.length < 2) continue;
+      const cx = ids.reduce((a, i) => a + pt[i].x, 0) / ids.length, cy = ids.reduce((a, i) => a + pt[i].y, 0) / ids.length;
+      const r = 15 / Math.sin(Math.PI / ids.length);   // pin da 28 px: centri a 30 px almeno
+      ids.forEach((i, k) => { const a = -Math.PI / 2 + (2 * Math.PI * k) / ids.length; out[i].x = cx + r * Math.cos(a); out[i].y = cy + r * Math.sin(a); });
+    }
+    return out;
   };
 
   /* contenuto di zone/<id>/stampa.json: tutto ciò che serve al motore, nell'ordine del giro */

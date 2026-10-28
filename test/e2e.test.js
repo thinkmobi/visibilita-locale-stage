@@ -198,6 +198,24 @@ test('7. giro: mappa Leaflet locale con un marker per tappa, click sul marker ap
   } finally { await t.chiudi(); }
 });
 
+test('7b. giro: due tappe nello stesso punto hanno i pin distanziati e numeri leggibili', async () => {
+  const t = await apri({ vista: 'giro', mutaGh: (gh) => {
+    const z = gh.json(`zone/${ID}/zona.json`);
+    const a = z.attivita[z.prospect.p1.pid]; const b = z.attivita[z.prospect.p2.pid];
+    b.la = a.la + 0.00002; b.lo = a.lo;   // circa 2 m: i due pin si coprirebbero
+    gh.metti(`zone/${ID}/zona.json`, z);
+  } });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    await t.page.waitForSelector('#mappaGiro .leaflet-marker-icon', { timeout: 8000 });
+    await t.page.waitForTimeout(400);
+    const r = await t.page.locator('#mappaGiro .leaflet-marker-icon').evaluateAll((els) => els.map((e) => { const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, w: b.width }; }));
+    assert.equal(r.length, 2);
+    assert.ok(Math.hypot(r[0].x - r[1].x, r[0].y - r[1].y) >= r[0].w, `pin sovrapposti: distanza ${Math.hypot(r[0].x - r[1].x, r[0].y - r[1].y)} per pin da ${r[0].w}`);
+    assert.deepEqual(t.errori, []);
+  } finally { await t.chiudi(); }
+});
+
 test('8. «Genera PDF»: scrive stampa.json con le tappe del giro e mostra «Apri» all’esito', async () => {
   const t = await apri({ vista: 'giro' });
   try {
@@ -442,6 +460,28 @@ test('10. versione: VERSIONE, CACHE e ?v= coincidono; la «v» compare solo nel 
     await t.page.waitForFunction(() => /Versione v/.test(document.querySelector('#vista').innerText), null, { timeout: 8000 });
     assert.match(await testoVista(t.page), new RegExp(`Versione v${v.replace(/\./g, '\\.')}`));
   } finally { await t.chiudi(); }
+});
+
+test('10c. stage: sotto /…-stage/ l’app è di stage e non scrive sui dati di produzione, ma sì su quelli di stage', async () => {
+  const stage = async (repo) => {
+    const t = await apri({});
+    await t.ctx.addInitScript((r) => { try { localStorage.setItem('vl-cfg-stage', JSON.stringify(r)); } catch (e) { /* */ } }, { ...SESSIONE, repo });
+    await t.page.goto(web.url.replace(/\/$/, '') + '/visibilita-locale-stage/#oggi');
+    return t;
+  };
+  const t1 = await stage('visibilita-dati');
+  try {
+    await t1.page.waitForFunction(() => document.documentElement.dataset.amb === 'stage', null, { timeout: 8000 });
+    const err = await t1.page.evaluate(async () => { try { await GH.put('prova.txt', btoa('x'), null, 'prova'); return ''; } catch (e) { return e.message; } });
+    assert.match(err, /Stage: scrittura bloccata/);
+    assert.equal(t1.gh.json('prova.txt'), null);
+  } finally { await t1.chiudi(); }
+  const t2 = await stage('visibilita-dati-stage');
+  try {
+    await t2.page.waitForFunction(() => document.documentElement.dataset.amb === 'stage', null, { timeout: 8000 });
+    const err = await t2.page.evaluate(async () => { try { await GH.put('prova.txt', btoa('x'), null, 'prova'); return ''; } catch (e) { return e.message; } });
+    assert.doesNotMatch(err, /bloccata/, 'con i dati di stage la scrittura non va bloccata');   // il GitHub finto risponde solo per visibilita-dati: qualunque altro esito va bene
+  } finally { await t2.chiudi(); }
 });
 
 test('11. service worker: si registra e dopo il primo caricamento l’app si apre anche senza rete', async () => {
