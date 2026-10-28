@@ -385,16 +385,31 @@ AVVISI_F = []
 
 
 def genera_fogli(job, cartella, out, firma):
-    """un foglio per pagina, A4 orizzontale a grandezza piena (regola del 28/10/2026); restituisce gli avvisi"""
+    """due fogli per pagina A4 verticale, uno per attività; restituisce gli avvisi"""
     AVVISI_F.clear()
     if job.get("punti_ai") and len(job["punti_ai"]) != len(job["punti"]):
         raise ValueError("le griglie Maps e AI Mode non hanno lo stesso numero di punti: rifai l'import della zona")
     bg = os.path.join(cartella, job["sfondo"]) if job.get("sfondo") else None
     if bg and not os.path.exists(bg): AVVISI_F.append("sfondo mappa non trovato: fogli senza mappa"); bg = None
-    c = canvas.Canvas(out, pagesize=landscape(A4))
+    # stampa verticale: due fogli per pagina A4, uno sopra l'altro, per dimezzare i costi di stampa.
+    # Ogni foglio è disegnato in A4 orizzontale e ridotto a metà pagina (fattore 1/√2: 297×210 mm → 210×148,5 mm)
+    PW, PH = A4
+    LW, LH = landscape(A4)
+    k = PW / LW
+    c = canvas.Canvas(out, pagesize=A4)
     c.setTitle(job.get("titolo_pdf", "Visibilità su Google")); c.setAuthor(firma["nome"] + " Consulente")
-    for f in job["fogli"]:
-        pagina(c, job, f, bg, firma)
+    fogli = job["fogli"]
+    for i in range(0, len(fogli), 2):
+        for j, f in enumerate(fogli[i:i + 2]):
+            y0 = PH / 2 if j == 0 else PH / 2 - LH * k
+            c.saveState()
+            pth = c.beginPath(); pth.rect(0, y0, PW, LH * k); c.clipPath(pth, stroke=0, fill=0)
+            c.translate(0, y0); c.scale(k, k)
+            pagina(c, job, f, bg, firma)
+            c.restoreState()
+        if len(fogli) - i > 1:   # linea di taglio tra i due fogli
+            c.setStrokeColor(HexColor("#B8BCC2")); c.setLineWidth(.4); c.setDash(2, 2); c.line(4 * mm, PH / 2, PW - 4 * mm, PH / 2); c.setDash()
+            c.setFillColor(HexColor("#B8BCC2")); c.setFont("DJ", 6); c.drawString(4 * mm, PH / 2 + .8 * mm, "\u2702")
         c.showPage()
     c.save()
     return list(AVVISI_F)
