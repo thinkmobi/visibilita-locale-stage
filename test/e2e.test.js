@@ -303,6 +303,26 @@ test('8e. liste: barre del posizionamento con la quota di zone tra i primi 3 (Ma
   } finally { await t.chiudi(); }
 });
 
+test('8f. zona: «Ultimo PDF» cambia colore solo se il PDF è già stato generato', async () => {
+  const colore = async (t) => {
+    await t.page.evaluate((id) => { location.hash = '#z/' + id; }, ID);
+    await t.page.waitForSelector('#zPdf');
+    await t.page.waitForTimeout(600);
+    return t.page.locator('#zPdf').evaluate((b) => ({ ok: b.classList.contains('pdf-ok'), bg: getComputedStyle(b).backgroundColor }));
+  };
+  const senza = await apri({ vista: 'zone' });
+  let bianco;
+  try { await attendiStato(senza.page, /Aggiornato/); const r = await colore(senza); assert.equal(r.ok, false); bianco = r.bg; } finally { await senza.chiudi(); }
+  const con = await apri({ vista: 'zone', mutaGh: (gh) => gh.metti(`zone/${ID}/stampa/esito.json`, { file: 'stampa/20261023-Prova.pdf', richiesta: '1', tipo: 'fogli' }) });
+  try {
+    await attendiStato(con.page, /Aggiornato/);
+    const r = await colore(con);
+    assert.equal(r.ok, true, 'con esito.json il pulsante deve avere la classe pdf-ok');
+    assert.notEqual(r.bg, bianco, 'il colore deve cambiare');
+    assert.deepEqual(con.errori, []);
+  } finally { await con.chiudi(); }
+});
+
 test('9. regole di interfaccia: etichette di stato, posizioni in cifre, «rivendicata» solo da c/cv, priorità', async () => {
   const t = await apri({ vista: 'giro' });
   try {

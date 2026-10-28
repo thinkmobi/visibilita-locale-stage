@@ -169,6 +169,7 @@ select.ora{width:96px;font-family:PlexMono;font-size:16px;font-weight:500;min-he
 .barra-giro .btn{white-space:nowrap;padding:9px 11px}
 .barra-giro input[type=date]{width:100%;min-width:0}
 select.ora,.btn.mini:not(.ink){background-color:#fff}   /* il pulsante scuro "Apri PDF" resta scuro */
+.btn.mini.pdf-ok:not(.ink){background-color:var(--top-t);border-color:#BFE0C9;color:var(--g1);font-weight:600}   /* «Ultimo PDF» con PDF già generato */
 select.ora{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235F6B70' stroke-width='1.8'/%3E%3C/svg%3E") no-repeat right 8px center}
 /* pallino di priorità: piccolo, stesso colore della pillola */
 .pt{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px;flex:none}

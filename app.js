@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.31.1';
+const VERSIONE = '0.32.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -1091,6 +1091,13 @@ function apriZona(zid) {
     const w = window.open('', '_blank'); if (w) w.document.write('<p style="font:16px system-ui;padding:24px">Cerco l\'ultimo PDF…</p>');
     try { const e = await GH.getJSON(`zone/${zid}/stampa/esito.json`); if (e && e.data.file) apriPdf(zid, e.data.file, w); else { if (w) w.close(); toast('Nessun PDF ancora'); } } catch (e) { if (w) w.close(); toast(e.message); }
   };
+  // «Ultimo PDF» cambia colore quando un PDF della zona esiste già (stesso dato che il pulsante apre al tocco).
+  // Si guarda prima l'elenco della cartella: senza cartella stampa/ non parte nessuna richiesta a un file che non c'è (404)
+  if (GH.ok()) GH.list(`zone/${zid}`).then(async (el) => {
+    if (!(el || []).some((x) => x.name === 'stampa')) return;
+    const e = await GH.getJSON(`zone/${zid}/stampa/esito.json`); const b = $('#zPdf', f);
+    if (b && e && e.data.file && !e.data.errore) { b.classList.add('pdf-ok'); b.title = 'PDF già generato: ' + e.data.file.split('/').pop(); }
+  }).catch(() => { /* pulsante normale */ });
   $('#zTesti', f).onclick = () => testiZona(zid);
   $('#zSiti', f).onclick = async () => {
     if (!GH.ok()) { toast('Serve il collegamento GitHub'); return; }
