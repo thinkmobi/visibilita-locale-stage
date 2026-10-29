@@ -283,3 +283,20 @@ html[data-amb="stage"] .top{border-bottom:3px solid #F29529}
 .pos-t{height:7px;border-radius:4px;background:#E6E9E7;overflow:hidden}.pos-t i{display:block;height:100%;border-radius:4px}
 .pos-t i.pos-top{background:var(--g2)}.pos-t i.pos-mid{background:var(--y)}.pos-t i.pos-low{background:var(--r1)}
 .pos-r b{font-family:PlexCond;font-size:14px;text-align:right}
+
+/* storia del cliente: tutti i contatti in un colpo d'occhio */
+.storia{background:#fff}
+.st-num{margin:6px 0 10px;font-size:14px}.st-num b{font:700 20px PlexCond}
+.st-linea{display:flex;gap:0;align-items:flex-end;position:relative;padding:4px 2px 0;overflow-x:auto}
+.st-linea:before{content:"";position:absolute;left:8px;right:8px;bottom:44px;border-top:2px solid var(--line)}
+.st-g{flex:1;min-width:52px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative}
+.st-p{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 13px PlexCond,system-ui;border:2px solid;position:relative;z-index:1}
+.st-n{font:600 11px PlexMono,monospace;color:var(--mute);min-height:14px}.st-c{font-size:12px;color:var(--mute);min-height:16px}
+.st-d{font:500 11px PlexMono,monospace;color:var(--mute)}
+.st-p.att,.st-k.att{background:#FDF3D3;border-color:#B88A00;color:#7A5C00}
+.st-p.rep,.st-k.rep{background:#E3EEFD;border-color:#1A73E8;color:#1557B0}
+.st-p.pos,.st-k.pos{background:#E3F3E7;border-color:var(--g1);color:var(--g1)}
+.st-p.neg,.st-k.neg{background:#FBE5E4;border-color:var(--r2);color:var(--r2)}
+.st-chiave{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 8px}
+.st-k{border:1px solid;border-radius:14px;padding:3px 9px;font-size:13px}.st-k small{opacity:.8;margin-left:3px}
+.st-ult{border-top:1px solid var(--line);padding-top:8px;margin-top:4px}

@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.32.0';
+const VERSIONE = '0.33.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -404,6 +404,30 @@ const inLavoro = (x) => !nonInteressato(x.z, x.p);
 // da ripassare: tappa non consegnata con ultimo esito Chiuso/Ripassare, o prossima azione "Ripassare"
 const ripassare = (z, p) => { if ((p.giro && p.giro.fatto) || !aperto(p)) return false; const r = ultimoReg(z, p.id); return (r && esitiDi(r).some((e) => e === 'Chiuso' || e === 'Ripassare')) || /^ripassare/i.test(p.prossima || ''); };
 const badgeRC = (z, p) => (reportCompleto(z, p) && !/report completo/i.test(p.prossima || '') ? '<span class="badge-rc">Report completo da preparare</span>' : '');
+
+/* storia del cliente: tutti i contatti in un colpo d'occhio */
+const ESITO_TIPO = (e) => /Non interessato|Obiezione|Perso/.test(e) ? 'neg' : /Interessato|Appuntamento|Proposta|Firmato/.test(e) ? 'pos' : /report/i.test(e) ? 'rep' : 'att';
+const TIPO_RANGO = { neg: 4, pos: 3, rep: 2, att: 1 };
+const TIPO_SEGNO = { neg: '✕', pos: '✓', rep: '▤', att: '↻' };
+const CANALE_ICO = { Telefono: '☎', Passaggio: '⌂', Visita: '⌂', WhatsApp: '✆', Email: '@', LinkedIn: 'in' };
+function storiaCliente(reg) {
+  const cr = [...reg].reverse();   // dal primo all'ultimo
+  const tipo = (r) => esitiDi(r).map(ESITO_TIPO).sort((a, b) => TIPO_RANGO[b] - TIPO_RANGO[a])[0] || 'att';
+  const giorni = []; cr.forEach((r) => { const g = giorni[giorni.length - 1]; if (g && g.data === r.data) g.r.push(r); else giorni.push({ data: r.data, r: [r] }); });
+  const perCanale = {}; cr.forEach((r) => { const c = canaleT(r.canale); perCanale[c] = (perCanale[c] || 0) + 1; });
+  const durata = Math.round((new Date(oggi()) - new Date(cr[0].data)) / 864e5);
+  const chiave = []; const visti = new Set();
+  cr.forEach((r) => esitiDi(r).forEach((e) => { const t = ESITO_TIPO(e); if (t !== 'att' && !visti.has(e)) { visti.add(e); chiave.push({ e, t, data: r.data }); } }));
+  const u = reg[0];
+  return `<div class="box storia">
+    <div class="riga"><span class="eb" style="margin:0">Storia del cliente</span><span class="data">dal ${gg(cr[0].data)} · ${durata} gg</span></div>
+    <div class="st-num"><b>${reg.length}</b> contatti${Object.entries(perCanale).sort((x, y) => y[1] - x[1]).map(([c, n]) => ` · ${n} ${CANALE_ICO[c] || ''} ${esc((n > 1 ? ({ Telefono: 'telefonate', Passaggio: 'passaggi', Visita: 'visite', Email: 'email', WhatsApp: 'WhatsApp', LinkedIn: 'LinkedIn' })[c] : ({ Telefono: 'telefonata' })[c]) || c.toLowerCase())}`).join('')}</div>
+    <div class="st-linea">${giorni.map((g) => `${((t) => `<div class="st-g"><span class="st-n">${g.r.length > 1 ? '×' + g.r.length : ''}</span><span class="st-p ${t}" title="${esc(g.r.map((r) => esitiDi(r).join(' · ')).join(' / '))}">${TIPO_SEGNO[t]}</span><span class="st-d">${gg(g.data)}</span><span class="st-c">${[...new Set(g.r.map((r) => CANALE_ICO[canaleT(r.canale)] || ''))].join(' ')}</span></div>`)(g.r.map(tipo).sort((x, y) => TIPO_RANGO[y] - TIPO_RANGO[x])[0])}`).join('')}</div>
+    ${chiave.length ? `<div class="st-chiave">${chiave.map((k) => `<span class="st-k ${k.t}">${TIPO_SEGNO[k.t]} ${esc(k.e)} <small>${gg(k.data)}</small></span>`).join('')}</div>` : ''}
+    <div class="st-ult"><span class="sub">Ultimo · ${gg(u.data)} · ${esc(canaleT(u.canale))}${u.interlocutore ? ' · con ' + esc(u.interlocutore) : ''}</span>
+      <div class="scelte" style="margin-top:4px">${esitiDi(u).map((e) => `<span class="chip on">${esc(e)}</span>`).join('')}</div>${u.emerso ? `<div>${esc(u.emerso)}</div>` : ''}</div>
+    ${reg.length > 1 ? `<a class="sub" href="#" id="vaiRegistro">Tutti i ${reg.length} contatti ↓</a>` : ''}</div>`;
+}
 const esitoBreve = (r) => esitiDi(r).map((e) => esc(e)).join(' · ');
 /* posizionamento nelle liste: quota di zone tra i primi 3, AI Mode (piattaforma primaria) sopra Maps, con barre */
 function posizionamento(z, p) {
@@ -567,10 +591,7 @@ function apriProspect(zid, id, opz = {}) {
     <a class="btn" ${sito ? `href="${/^https?:/.test(sito) ? esc(sito) : 'https://' + esc(sito)}" target="_blank" rel="noopener"` : 'aria-disabled="true"'}>${ico('web')}Sito</a>
   </div>
   <button class="btn pri" style="width:100%" id="registra">Registra contatto</button>
-  ${reg.length ? `<div class="box ultimo-box"><div class="riga"><span class="eb" style="margin:0">Ultimo contatto</span><span class="data">${gg(reg[0].data)} · ${esc(canaleT(reg[0].canale))}</span></div>
-    <div class="scelte" style="margin-top:6px">${esitiDi(reg[0]).map((e) => `<span class="chip on">${esc(e)}</span>`).join('')}</div>
-    ${reg[0].interlocutore ? `<div class="sub">con ${esc(reg[0].interlocutore)}</div>` : ''}${reg[0].emerso ? `<div>${esc(reg[0].emerso)}</div>` : ''}
-    ${reg.length > 1 ? `<a class="sub" href="#" id="vaiRegistro">Tutti i ${reg.length} contatti ↓</a>` : ''}</div>` : ''}
+  ${reg.length ? storiaCliente(reg) : ''}
   <div class="box">
     <div class="eb" style="margin-top:0">Prossima azione</div>
     <label class="f">Stato${sel('stato', STATI, p.stato)}</label>
