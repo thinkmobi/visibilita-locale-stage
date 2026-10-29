@@ -409,23 +409,26 @@ const badgeRC = (z, p) => (reportCompleto(z, p) && !/report completo/i.test(p.pr
 const ESITO_TIPO = (e) => /Non interessato|Obiezione|Perso/.test(e) ? 'neg' : /Interessato|Appuntamento|Proposta|Firmato/.test(e) ? 'pos' : /report/i.test(e) ? 'rep' : 'att';
 const TIPO_RANGO = { neg: 4, pos: 3, rep: 2, att: 1 };
 const TIPO_SEGNO = { neg: '✕', pos: '✓', rep: '▤', att: '↻' };
-const CANALE_ICO = { Telefono: '☎', Passaggio: '⌂', Visita: '⌂', WhatsApp: '✆', Email: '@', LinkedIn: 'in' };
+const CANALE_ICO = { Telefono: '☎', Passaggio: '⌂', Visita: '◎', WhatsApp: '✆', Email: '@', LinkedIn: 'in' };
 function storiaCliente(reg) {
-  const cr = [...reg].reverse();   // dal primo all'ultimo
-  const tipo = (r) => esitiDi(r).map(ESITO_TIPO).sort((a, b) => TIPO_RANGO[b] - TIPO_RANGO[a])[0] || 'att';
+  const cr = [...reg].reverse();   // dal primo all'ultimo, da sinistra a destra
   const giorni = []; cr.forEach((r) => { const g = giorni[giorni.length - 1]; if (g && g.data === r.data) g.r.push(r); else giorni.push({ data: r.data, r: [r] }); });
   const perCanale = {}; cr.forEach((r) => { const c = canaleT(r.canale); perCanale[c] = (perCanale[c] || 0) + 1; });
   const durata = Math.round((new Date(oggi()) - new Date(cr[0].data)) / 864e5);
-  const chiave = []; const visti = new Set();
-  cr.forEach((r) => esitiDi(r).forEach((e) => { const t = ESITO_TIPO(e); if (t !== 'att' && !visti.has(e)) { visti.add(e); chiave.push({ e, t, data: r.data }); } }));
-  const u = reg[0];
-  return `<div class="box storia">
+  // un segmento a freccia per giorno di contatto (come il percorso di Salesforce Lightning): l'esito più importante del giorno
+  const seg = (g, k) => {
+    const es = [...new Set(g.r.flatMap(esitiDi))];
+    const prim = es.slice().sort((a, b) => TIPO_RANGO[ESITO_TIPO(b)] - TIPO_RANGO[ESITO_TIPO(a)])[0] || canaleT(g.r[0].canale);
+    const t = es.length ? ESITO_TIPO(prim) : 'att';
+    const canali = [...new Set(g.r.map((r) => CANALE_ICO[canaleT(r.canale)] || ''))].join(' ');
+    return `<button type="button" class="st-seg st-${t}${k === giorni.length - 1 ? ' on' : ''}" data-stg="${k}"><span class="st-e">${TIPO_SEGNO[t]} ${esc(prim)}</span><span class="st-d">${gg(g.data)} · ${canali}${g.r.length > 1 ? ' · ×' + g.r.length : ''}</span></button>`;
+  };
+  const dett = giorni.map((g) => g.r.slice().reverse().map((r) => `<div class="st-r"><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}${r.interlocutore ? ' · con ' + esc(r.interlocutore) : ''}</span><div>${esitoBreve(r)}${r.emerso ? ' · ' + esc(r.emerso) : ''}</div></div>`).join(''));
+  return `<div class="box storia" data-dett="${esc(JSON.stringify(dett))}">
     <div class="riga"><span class="eb" style="margin:0">Storia del cliente</span><span class="data">dal ${gg(cr[0].data)} · ${durata} gg</span></div>
-    <div class="st-num"><b>${reg.length}</b> contatti${Object.entries(perCanale).sort((x, y) => y[1] - x[1]).map(([c, n]) => ` · ${n} ${CANALE_ICO[c] || ''} ${esc((n > 1 ? ({ Telefono: 'telefonate', Passaggio: 'passaggi', Visita: 'visite', Email: 'email', WhatsApp: 'WhatsApp', LinkedIn: 'LinkedIn' })[c] : ({ Telefono: 'telefonata' })[c]) || c.toLowerCase())}`).join('')}</div>
-    <div class="st-linea">${giorni.map((g) => `${((t) => `<div class="st-g"><span class="st-n">${g.r.length > 1 ? '×' + g.r.length : ''}</span><span class="st-p ${t}" title="${esc(g.r.map((r) => esitiDi(r).join(' · ')).join(' / '))}">${TIPO_SEGNO[t]}</span><span class="st-d">${gg(g.data)}</span><span class="st-c">${[...new Set(g.r.map((r) => CANALE_ICO[canaleT(r.canale)] || ''))].join(' ')}</span></div>`)(g.r.map(tipo).sort((x, y) => TIPO_RANGO[y] - TIPO_RANGO[x])[0])}`).join('')}</div>
-    ${chiave.length ? `<div class="st-chiave">${chiave.map((k) => `<span class="st-k ${k.t}">${TIPO_SEGNO[k.t]} ${esc(k.e)} <small>${gg(k.data)}</small></span>`).join('')}</div>` : ''}
-    <div class="st-ult"><span class="sub">Ultimo · ${gg(u.data)} · ${esc(canaleT(u.canale))}${u.interlocutore ? ' · con ' + esc(u.interlocutore) : ''}</span>
-      <div class="scelte" style="margin-top:4px">${esitiDi(u).map((e) => `<span class="chip on">${esc(e)}</span>`).join('')}</div>${u.emerso ? `<div>${esc(u.emerso)}</div>` : ''}</div>
+    <div class="st-num"><b>${reg.length}</b> contatti<span class="st-can">${Object.entries(perCanale).sort((x, y) => y[1] - x[1]).map(([c, n]) => `<span title="${esc(c)}">${CANALE_ICO[c] || esc(c)} ${n}</span>`).join('')}</span></div>
+    <div class="st-path">${giorni.map(seg).join('')}</div>
+    <div class="st-dett">${dett[dett.length - 1]}</div>
     ${reg.length > 1 ? `<a class="sub" href="#" id="vaiRegistro">Tutti i ${reg.length} contatti ↓</a>` : ''}</div>`;
 }
 const esitoBreve = (r) => esitiDi(r).map((e) => esc(e)).join(' · ');
@@ -686,6 +689,9 @@ function apriProspect(zid, id, opz = {}) {
   };
   if (opz.salvato) statoBarra(f, 'salvato', opz.salvato);
   $('#annulla', f).onclick = annulla;
+  const sto = $('.storia', f);
+  if (sto) { const dd = JSON.parse(sto.dataset.dett || '[]'); const pth = $('.st-path', sto); pth.scrollLeft = pth.scrollWidth;   // si apre sull'ultimo contatto
+    sto.querySelectorAll('[data-stg]').forEach((b) => (b.onclick = () => { sto.querySelectorAll('.st-seg').forEach((x) => x.classList.toggle('on', x === b)); $('.st-dett', sto).innerHTML = dd[+b.dataset.stg] || ''; })); }
   if ($('#vaiRegistro', f)) $('#vaiRegistro', f).onclick = (e) => { e.preventDefault(); $('#registroP', f).scrollIntoView({ behavior: 'smooth', block: 'start' }); };
   // registro: correggere o eliminare un contatto invece di registrarlo di nuovo
   f.querySelectorAll('[data-rmod]').forEach((b) => (b.onclick = () => { if (salva() !== false) formContatto(zid, id, { modifica: b.dataset.rmod }); }));
