@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.34.0';
+const VERSIONE = '0.35.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -311,8 +311,8 @@ const pallino = (pr) => (pr ? `<i class="pt pt${pr[0]}" aria-hidden="true"></i>`
 const prioHtml = (pr) => (pr ? `${pallino(pr)}${esc(pr)}` : '—');
 
 /* ---------- router ---------- */
-const VISTE = { oggi: vOggi, prospect: vProspect, giro: vGiro, zone: vZone, cruscotto: vCruscotto, tabella: vTabella, altro: vAltro };
-const TITOLI = { oggi: 'Oggi', prospect: 'Prospect', giro: 'Giro', zone: 'Zone', cruscotto: 'Numeri', tabella: 'Tabella', altro: 'Profilo' };
+const VISTE = { oggi: vOggi, prospect: vProspect, giro: vGiro, zone: vZone, cruscotto: vCruscotto, tabella: vTabella, altro: vAltro, analisi: vAnalisi };
+const TITOLI = { oggi: 'Oggi', prospect: 'Prospect', giro: 'Giro', zone: 'Zone', cruscotto: 'Numeri', tabella: 'Tabella', altro: 'Profilo', analisi: 'Analisi' };
 /* app e dati devono essere dello stesso ambiente: stage con visibilita-dati (o produzione con …-stage) va segnalato */
 function avvisoAmbiente() {
   const r = ST.cfg && ST.cfg.repo;
@@ -581,6 +581,38 @@ const ETIC_TESTI = { nome: 'Nome in copertina', coverSub: 'Copertina · sottotit
   card1t: 'Punto debole 1 · titolo', card1c: 'Punto debole 1 · causa', card1e: 'Punto debole 1 · effetto', card2t: 'Punto debole 2 · titolo', card2c: 'Punto debole 2 · causa', card2e: 'Punto debole 2 · effetto',
   card3t: 'Punto debole 3 · titolo', card3c: 'Punto debole 3 · causa', card3e: 'Punto debole 3 · effetto', ctaTitle: 'Chiusura · titolo', ctaSub: 'Chiusura · testo',
   planTitle: 'Piano (interno) · titolo', step1: 'Piano · passo 1', step1txt: 'Piano · passo 1 · testo', step2: 'Piano · passo 2', step2txt: 'Piano · passo 2 · testo', step3: 'Piano · passo 3', step3txt: 'Piano · passo 3 · testo', planNote: 'Piano · nota' };
+/* elenco delle analisi dedicate di tutte le zone: si legge dal repository (cartelle zone/<id>/analisi) */
+async function caricaAnalisi() {
+  if (!GH.ok()) { ST.anElenco = { voci: [], t: ora() }; return; }
+  const voci = [];
+  await Promise.all(Object.keys(ST.zone).map(async (zid) => {
+    const zl = await GH.list(`zone/${zid}`).catch(() => []); if (!(zl || []).some((x) => x.name === 'analisi')) return;
+    const el = await GH.list(`zone/${zid}/analisi`).catch(() => []); const per = {};
+    (el || []).forEach((x) => { const m = x.name.match(/^(.+)-(richiesta|esito|testi)\.json$/); if (m) (per[m[1]] = per[m[1]] || {})[m[2]] = true; });
+    await Promise.all(Object.entries(per).map(async ([k, f]) => {
+      const leggi = (t) => (f[t] ? GH.getJSON(`zone/${zid}/analisi/${k}-${t}.json`).then((r) => r && r.data).catch(() => null) : null);
+      const [rq, es, te] = await Promise.all([leggi('richiesta'), leggi('esito'), leggi('testi')]);
+      const pid = (rq && rq.pid) || (te && te.pid); if (!pid) return;
+      const z = ST.zone[zid].z, a = (z.attivita || {})[pid] || {};
+      const nome = (te && te.testi && te.testi.nome) || (rq && rq.data && rq.data.business && rq.data.business.name) || a.n || pid;
+      const t = rq && /^\d{13}$/.test(rq.richiesta) ? Number(rq.richiesta) : (te && te.u) || 0;
+      voci.push({ zid, pid, nome, t, pdf: es && es.richiesta === (rq && rq.richiesta) && !es.errore ? es.file : (es && es.file) || null, errore: es && es.errore, zona: `${z.meta.quartiere} · «${z.meta.keyword}»` });
+    }));
+  }));
+  voci.sort((x, y) => y.t - x.t || x.nome.localeCompare(y.nome));
+  ST.anElenco = { voci, t: ora() };
+}
+function vAnalisi() {
+  const E = ST.anElenco;
+  if (!E || ora() - E.t > 60000) { if (!ST.anCarica) { ST.anCarica = caricaAnalisi().catch(() => {}).finally(() => { ST.anCarica = null; if (location.hash.startsWith('#analisi') || location.hash.startsWith('#zone')) render(); }); } }
+  if (!E) return `<div class="vuoto">${GH.ok() ? 'Cerco le analisi in tutte le zone…' : 'Collega il repository dati da Profilo per vedere le analisi.'}</div>`;
+  const q = (ST.f.anQ || '').toLowerCase(), voci = E.voci.filter((v) => !q || (v.nome + ' ' + v.zona).toLowerCase().includes(q));
+  return `<input class="cerca" id="anCerca" placeholder="Cerca attività o zona…" value="${esc(ST.f.anQ || '')}">
+  <div class="sub mt">${E.voci.length} ${E.voci.length === 1 ? 'analisi' : 'analisi'}${ST.anCarica ? ' · aggiorno…' : ''} · nuova analisi da Zone → zona → «Analisi dedicata»</div>
+  <div class="lista mt">${voci.map((v) => `<div class="card"><div class="riga"><span class="nome">${esc(v.nome)}</span>${v.t ? `<span class="data">${esc(oraRoma(v.t, { day: 'numeric', month: 'short' }))}</span>` : ''}</div>
+    <div class="sub">${esc(v.zona)}${v.errore ? ' · <span class="c-neg">PDF non riuscito</span>' : v.pdf ? '' : ' · PDF non ancora generato'}</div>
+    <div class="row mt"><a class="btn mini ink" href="#an/${v.zid}/${encodeURIComponent(v.pid)}">Apri l'analisi</a>${v.pdf ? `<button class="btn mini" data-pdf="${v.zid}|${esc(v.pdf)}">PDF</button>` : ''}</div></div>`).join('') || `<div class="vuoto">${q ? 'Nessuna analisi con questa ricerca.' : 'Nessuna analisi ancora: aprine una da Zone → zona → «Analisi dedicata».'}</div>`}</div>`;
+}
 /* scelta dell'attività dalla zona: prima la più vicina al centro della griglia (di solito la scheda su cui è centrata la scansione) */
 function sceltaAnalisi(zid) {
   const z = ST.zone[zid].z, m = z.meta;
@@ -615,7 +647,7 @@ async function apriAnalisi(zid, pid) {
   /* testi corretti a mano: un campo per testo, vuoto = testo automatico */
   let tSalva = null, tDis = null;
   const salvaTesti = async () => { if (!GH.ok()) return;
-    try { st.sha = await GH.putJSON(`${dir}/${k}-testi.json`, { pid, testi: st.testi, u: ora() }, st.sha, `Testi analisi ${a.n}`); const o = $('#anTs'); if (o) o.textContent = '✓ Salvato alle ' + oraAdesso(); }
+    try { st.sha = await GH.putJSON(`${dir}/${k}-testi.json`, { pid, testi: st.testi, u: ora() }, st.sha, `Testi analisi ${a.n}`); ST.anElenco = null; const o = $('#anTs'); if (o) o.textContent = '✓ Salvato alle ' + oraAdesso(); }
     catch (e) { toast(e.message); } };
   $('#anT', f).onclick = () => { const p = $('#anTesti'); p.hidden = !p.hidden; if (p.hidden) return;
     p.innerHTML = `<div class="riga"><b>Testi dell'analisi</b><span class="sub" id="anTs">Campo vuoto = testo automatico</span></div>` + Object.keys(st.base).filter((c) => ETIC_TESTI[c]).map((c) => `<label class="f">${esc(ETIC_TESTI[c])}<textarea data-at="${c}" rows="2" placeholder="${esc(st.base[c])}">${esc(st.testi[c] || '')}</textarea></label>`).join('');
@@ -632,7 +664,7 @@ async function apriAnalisi(zid, pid) {
     const job = { tipo: 'analisi', richiesta: String(Date.now()), pid, file: L.fileAnalisi(z, pid, oggi()), data, testi: st.testi };
     try {
       esito.textContent = 'Invio…';
-      await GH.putJSON(`${dir}/${k}-richiesta.json`, job, await GH.sha(`${dir}/${k}-richiesta.json`), `Analisi ${a.n}`);
+      await GH.putJSON(`${dir}/${k}-richiesta.json`, job, await GH.sha(`${dir}/${k}-richiesta.json`), `Analisi ${a.n}`); ST.anElenco = null;
       const t0 = ora();
       while (ora() - t0 < 8 * 60000) {
         await new Promise((ok) => setTimeout(ok, 6000));
@@ -1150,8 +1182,10 @@ function lavoroZona(z) {
   return `<div class="lavoro-zona">${out.join('')}${giro}</div>`;
 }
 function vZone() {
-  const ids = Object.keys(ST.zone).sort().reverse();
-  return `<div class="row"><button class="btn pri" id="nuovaScan">Nuova zona da Local Falcon</button><label class="btn">Importa file zona<input type="file" id="impZona" accept=".json,.png" multiple hidden></label></div>
+  const ids = Object.keys(ST.zone).sort().reverse(); const na = ST.anElenco ? ST.anElenco.voci.length : null;
+  if (!ST.anElenco && !ST.anCarica && GH.ok() && ids.length) ST.anCarica = caricaAnalisi().catch(() => {}).finally(() => { ST.anCarica = null; if (location.hash.startsWith('#zone')) render(); });
+  return `<a class="card an-link" href="#analisi"><div class="riga"><span class="nome">Analisi dedicate</span>${na != null ? `<span class="pill">${na}</span>` : ''}</div><div class="sub">Tutte le analisi fatte, con deck e PDF, senza aprire le zone</div></a>
+  <div class="row"><button class="btn pri" id="nuovaScan">Nuova zona da Local Falcon</button><label class="btn">Importa file zona<input type="file" id="impZona" accept=".json,.png" multiple hidden></label></div>
   <div class="lista mt">${ids.map((id) => { const z = ST.zone[id].z; const np = Object.values(z.prospect || {}).filter((p) => !p.del).length;
     return `<a class="card" href="#z/${id}"><div class="riga"><span class="nome">${esc(z.meta.quartiere)}, ${esc(z.meta.citta)}</span><span class="data">${gg(z.meta.data)}</span></div>
     <div class="sub">«${esc(z.meta.keyword)}» · ${z.punti ? z.punti.length : 0} punti · ${Object.keys(z.attivita || {}).length} attività · ${np} prospect</div>${np ? lavoroZona(z) : ''}</a>`; }).join('') || '<div class="vuoto">Nessuna zona.</div>'}</div>
@@ -1551,6 +1585,7 @@ function legaVista(v) {
     V.querySelectorAll('[data-togli]').forEach((b) => (b.onclick = () => { const [zid, id] = b.dataset.togli.split('|'); const d = (ST.zone[zid].z.prospect[id].giro || {}).data; aggiorna(zid, id, { giro: {} }); rinumera(zid, d); modificato(zid); ST.restaScroll = true; render(); }));
     V.querySelectorAll('[data-stampa]').forEach((b) => (b.onclick = () => generaPdf(b.dataset.stampa, 'fogli')));
   }
+  if (v === 'analisi') { const q = $('#anCerca'); if (q) q.oninput = () => { ST.f.anQ = q.value; clearTimeout(ST.timer.anq); ST.timer.anq = setTimeout(() => { render(); const n = $('#anCerca'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 200); }; }
   if (v === 'zone') {
     $('#nuovaScan').onclick = formScansione;
     $('#impZona').onchange = (e) => importaFile(e.target.files);

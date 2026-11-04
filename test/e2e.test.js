@@ -522,6 +522,21 @@ test('10d. analisi dedicata: dalla scheda prospect si apre il deck, prima le sli
   } finally { await t.chiudi(); }
 });
 
+test('10e. analisi dedicate: elenco unico da Zone, senza aprire le zone', async () => {
+  const t = await apri({ vista: 'zone', mutaGh: (gh) => gh.metti(`zone/${ID}/analisi/pA-testi.json`, { pid: 'pA', testi: { nome: 'Agenzia Alfa centro' }, u: 1793790000000 }) });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    await t.page.waitForSelector('.an-link .pill');
+    await t.page.click('.an-link');
+    await t.page.waitForSelector('#anCerca');
+    await t.page.waitForFunction(() => /Agenzia Alfa centro/.test(document.querySelector('#vista').innerText));
+    assert.match(await t.page.locator('#vista').innerText(), /PDF non ancora generato/);
+    await t.page.click('text=Apri l\'analisi');
+    await t.page.waitForSelector('#anFrame');
+    assert.deepEqual(t.errori, []);
+  } finally { await t.chiudi(); }
+});
+
 test('11. service worker: si registra e dopo il primo caricamento l’app si apre anche senza rete', async () => {
   const t = await apri();
   try {
