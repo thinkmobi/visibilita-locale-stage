@@ -301,3 +301,10 @@ html[data-amb="stage"] .top{border-bottom:3px solid #F29529}
 .st-r .data{font-size:12px}
 .st-num{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}.st-can{display:inline-flex;gap:10px;margin-left:auto;color:var(--mute);font-size:14px}
 .st-path{align-items:stretch}.st-seg{height:54px;justify-content:center;box-sizing:border-box}
+
+/* analisi dedicata: deck nel foglio, testi sotto, pulsanti fissi in basso */
+.an-frame{display:block;width:100%;min-height:240px;border:0;border-radius:var(--r);background:#E9EBE8;margin-top:8px}
+.an-testi{margin-top:12px;display:grid;gap:6px}
+.an-testi textarea{min-height:52px}
+.an-barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 0;background:var(--bg);border-top:1px solid var(--line);margin-top:10px}
+.an-barra .pri{flex:1}

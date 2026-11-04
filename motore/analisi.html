@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Analisi visibilità locale</title>
+<!-- Roboto dai file del motore: niente rete per i font, stessa resa nell'app e nel PDF -->
+<style id="fonti">
+@font-face{font-family:'Roboto';font-weight:400;font-display:swap;src:url(fonts/roboto-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto';font-weight:400;font-display:swap;src:url(fonts/roboto-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto';font-weight:500;font-display:swap;src:url(fonts/roboto-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto';font-weight:500;font-display:swap;src:url(fonts/roboto-latin-ext-500-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto';font-weight:600;font-display:swap;src:url(fonts/roboto-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto';font-weight:600;font-display:swap;src:url(fonts/roboto-latin-ext-600-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto';font-weight:700;font-display:swap;src:url(fonts/roboto-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto';font-weight:700;font-display:swap;src:url(fonts/roboto-latin-ext-700-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto Condensed';font-weight:500;font-display:swap;src:url(fonts/roboto-condensed-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto Condensed';font-weight:500;font-display:swap;src:url(fonts/roboto-condensed-latin-ext-500-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto Condensed';font-weight:700;font-display:swap;src:url(fonts/roboto-condensed-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto Condensed';font-weight:700;font-display:swap;src:url(fonts/roboto-condensed-latin-ext-700-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto Mono';font-weight:400;font-display:swap;src:url(fonts/roboto-mono-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto Mono';font-weight:400;font-display:swap;src:url(fonts/roboto-mono-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto Mono';font-weight:500;font-display:swap;src:url(fonts/roboto-mono-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto Mono';font-weight:500;font-display:swap;src:url(fonts/roboto-mono-latin-ext-500-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Roboto Mono';font-weight:700;font-display:swap;src:url(fonts/roboto-mono-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Roboto Mono';font-weight:700;font-display:swap;src:url(fonts/roboto-mono-latin-ext-700-normal.woff2) format('woff2');unicode-range:U+0100-024F,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+</style>
+<style>
+/* Deck dell'analisi dedicata: slide 16:9 in cqw, stessa resa nell'app, su telefono e nel PDF (motore/analisi.py).
+   I dati arrivano da L.datiAnalisi (logica.js): window.disegna({data, testi, filtro, pdf}). */
+:root{--pg:#E9EBE8}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--pg)}
+body{padding:12px;font-family:'Roboto',system-ui,sans-serif}
+.deck{display:grid;gap:18px;max-width:1180px;margin:0 auto}
+.cap{font:500 11px/1 'Roboto Mono',ui-monospace,monospace;color:#5F6773;margin:0 0 6px;letter-spacing:.04em}
+.vuoto{font:15px/1.4 'Roboto',system-ui,sans-serif;color:#5F6773;padding:40px 16px;text-align:center}
+
+/* palette: legenda delle mappe (verde = primi posti, giallo/arancio = metà, rosso = in fondo o assente) */
+.skin-a{
+  --bg:#F4F5F3; --ink:#18232A; --muted:#5F6B70; --line:#D2D7D3; --panel:#FFFFFF;
+  --accent:#1E8E3E; --accent-ink:#FFFFFF; --home:#1A73E8;
+  --r1:#1E8E3E; --r2:#34A853; --r3:#6CC24A; --r4:#F6C026; --r5:#F29529; --r6:#E8603C; --r7:#C5221F;
+  --r1-ink:#FFFFFF; --r2-ink:#FFFFFF; --r3-ink:#18232A; --r4-ink:#18232A; --r5-ink:#18232A; --r6-ink:#FFFFFF; --r7-ink:#FFFFFF;
+  --contour:#D9DDD9;
+  --f-display:'Roboto Condensed','Arial Narrow',sans-serif; --f-body:'Roboto',system-ui,sans-serif; --f-mono:'Roboto Mono',ui-monospace,monospace;
+  --fs-title:3.8cqw; --fs-sub:2.3cqw; --fs-body:1.75cqw; --fs-label:1.1cqw;
+}
+.slide{position:relative;width:100%;aspect-ratio:16/9;container-type:inline-size;background:var(--bg);color:var(--ink);
+  font-family:var(--f-body);font-size:var(--fs-body);line-height:1.4;overflow:hidden;border-radius:.5cqw;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.sl{position:absolute;inset:0;font-size:var(--fs-body);padding:4cqw 5cqw 3cqw;display:grid;grid-template-rows:auto 1fr auto;gap:1.8cqw}
+.sl.withleg{grid-template-rows:auto 1fr auto auto}
+.eyebrow{font:700 var(--fs-label)/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:flex;gap:1.2cqw;align-items:center}
+.eyebrow i{display:inline-block;width:1.6cqw;height:.18cqw;background:var(--accent)}
+.eyebrow .pf{display:inline-flex;align-items:center;gap:.6cqw;color:var(--ink)}
+.eyebrow .pf svg{width:1.5cqw;height:1.5cqw}
+.title{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;font-size:var(--fs-title);line-height:1.06;margin:.9cqw 0 0;text-wrap:balance;max-width:80cqw}
+.foot{display:flex;justify-content:space-between;gap:2cqw;font:400 var(--fs-label)/1 var(--f-mono);color:var(--muted);border-top:.08cqw solid var(--line);padding-top:.9cqw}
+.foot span:first-child{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.legrow{display:flex;justify-content:flex-end}
+.body{min-height:0;display:grid;gap:3cqw;align-items:center}
+.big{font-family:var(--f-display);font-weight:700;font-size:9.5cqw;line-height:.85;letter-spacing:-.03em;color:var(--accent);font-variant-numeric:tabular-nums}
+.unit{font-size:.45em;letter-spacing:0}
+.lab{font:700 var(--fs-label)/1.3 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lab.plain{font-weight:400;text-transform:none;letter-spacing:0}
+.txt{font-size:var(--fs-body);line-height:1.4;max-width:46cqw}
+.kv{display:flex;gap:3cqw;flex-wrap:wrap}
+.kv div{display:grid;gap:.4cqw}
+.kv b{font-family:var(--f-display);font-weight:700;font-size:2.99cqw;line-height:1;font-variant-numeric:tabular-nums}
+.mapbox{position:relative;aspect-ratio:1;justify-self:end}
+.lfmap{position:relative;margin:0;aspect-ratio:1;justify-self:end;border-radius:.5cqw;overflow:hidden;background:var(--panel);border:.08cqw solid var(--line)}
+.lfmap .vec{position:absolute;inset:0;padding:.6cqw}
+.lfmap figcaption{position:absolute;left:.6cqw;bottom:.6cqw;font:500 var(--fs-label) var(--f-mono);background:var(--panel);color:var(--muted);padding:.25cqw .5cqw;border-radius:.3cqw}
+.grid{display:block;width:100%;height:100%}
+.svgt{font-family:var(--f-mono)}
+.legend{display:flex;gap:1.2cqw;flex-wrap:nowrap;white-space:nowrap;font:400 var(--fs-label) var(--f-mono);color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:.5cqw}
+.legend s{width:.9cqw;height:.9cqw;border-radius:50%;display:inline-block}
+.panel{background:var(--panel);border-radius:.6cqw;padding:2cqw}
+.neg,.eff{border-radius:.4cqw;background:#FCE4E2;border-left:.35cqw solid var(--r7);color:#5C1410}
+.neg{padding:1cqw 1.3cqw}
+.eff{margin-top:auto;padding:.7cqw 1cqw;font-size:var(--fs-body);font-weight:600}
+.flagrv{display:grid;grid-template-columns:3cqw 1fr;gap:1.2cqw;align-items:center;background:#FCE4E2;border-left:.4cqw solid var(--r7);border-radius:.4cqw;padding:1cqw 1.4cqw;color:#5C1410}
+.flagrv b{font-family:var(--f-display);font-size:2.1cqw;line-height:1.1}
+.flagrv svg{width:3cqw;height:3cqw}
+
+/* copertina e chiusura */
+.cover .sl{grid-template-rows:auto 1fr auto auto}
+.cover.first .sl{grid-template-rows:auto 1fr auto}
+.cover-bg{position:absolute;right:-3cqw;top:1.5cqw;width:47cqw;height:47cqw}
+.cover.first .cover-bg{right:-6cqw;top:calc(50% - 26cqw);width:52cqw;height:52cqw}
+.cover-name{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;font-size:6.57cqw;line-height:.95;margin:0;max-width:44cqw;text-wrap:balance;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden;padding-bottom:.14em;margin-bottom:-.14em}
+.contact{display:grid;gap:.8cqw;max-width:50cqw;position:relative;background:var(--panel);border-radius:.6cqw;padding:1.4cqw 1.8cqw;border-left:.4cqw solid var(--accent);justify-self:start}
+.contact .cname{font-family:var(--f-display);font-weight:700;font-size:var(--fs-sub);line-height:1.1;display:block}
+.contact .cline{display:flex;align-items:center;gap:1cqw;font-family:var(--f-display);font-weight:600;font-size:2cqw;line-height:1.1;font-variant-numeric:tabular-nums}
+.contact .cline svg{width:2cqw;height:2cqw;flex:none}
+
+/* guida alla lettura */
+.howto{display:grid;gap:.9cqw}
+.hrow{display:grid;grid-template-columns:3.2cqw 1fr;gap:1.2cqw;align-items:center}
+.hpin{width:3.2cqw;height:3.2cqw}
+.hrow b{font-family:var(--f-display);font-weight:700;font-size:var(--fs-body)}
+
+/* classifica: merchant evidenziato in blu */
+.cmp{display:grid;gap:.7cqw;width:100%}
+.cmp-h,.cmp-r{display:grid;grid-template-columns:2.4cqw 30cqw 1fr 6cqw;gap:1cqw;align-items:center}
+.cmp-h{font:700 var(--fs-label) var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-bottom:.4cqw;border-bottom:.08cqw solid var(--line)}
+.cmp-h span:first-child{grid-column:1 / 3}.cmp-h span:last-child{grid-column:3 / 5}
+.cmp-r .n{font-size:var(--fs-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trk{display:block;height:1.8cqw;background:#E6E9E6;border-radius:.3cqw;overflow:hidden}
+.fill{display:block;height:100%;background:#9AA4A8;border-radius:inherit}
+.fill.me{background:var(--home)}
+.pill{display:inline-grid;place-items:center;width:2.2cqw;height:2.2cqw;border-radius:50%;font:600 var(--fs-label) var(--f-mono);justify-self:end}
+.pill.rk{background:var(--panel);border:.12cqw solid var(--line);color:var(--ink)}.pill.rk.me{background:var(--home);border-color:var(--home);color:#fff}
+.top3sep{grid-column:1/-1;display:flex;align-items:center;gap:1cqw;font:700 var(--fs-label) var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.top3sep::after{content:"";flex:1;border-top:.12cqw solid var(--line)}
+.youtag{display:inline-block;margin-left:.6cqw;padding:.1cqw .5cqw;border-radius:.3cqw;background:var(--home);color:#fff;font:700 .9cqw var(--f-mono);letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
+.cmp-r.me{background:rgba(26,115,232,.09);box-shadow:inset .35cqw 0 0 var(--home);border-radius:.4cqw;margin:0 -.6cqw;padding:.35cqw .6cqw}
+.cmp-r.me .n{font-weight:600}
+.val{font:400 var(--fs-label) var(--f-mono);color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.val b{font-weight:600;color:var(--ink);font-size:var(--fs-body)}
+.duel{display:grid;gap:1cqw}
+.gap{font-size:var(--fs-body);border-top:.08cqw solid var(--line);padding-top:1cqw}
+
+/* AI Mode contro Maps: due mappe affiancate, anello e numeri sotto */
+.twin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4cqw;align-items:start}
+.tcol{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto 1fr;column-gap:2cqw;row-gap:1cqw;align-items:center}
+.tcol .ph{grid-column:1/-1}
+.tcol .ph{display:flex;align-items:center;gap:.7cqw;font-family:var(--f-display);font-weight:700;font-size:2cqw}
+.tcol .ph svg{width:2cqw;height:2cqw}
+.tstat{display:grid;gap:1cqw;align-content:center}
+.tstat .ring{width:8cqw;height:8cqw}
+.tstat b{display:block;font-family:var(--f-display);font-weight:700;font-size:2.4cqw;line-height:1}
+.ring{flex:none}
+
+/* punti deboli */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:2cqw;width:100%;align-self:stretch}
+.card{display:grid;grid-template-rows:auto auto auto 1fr;align-content:start;gap:.7cqw;padding:1.3cqw 1.5cqw}
+.card .ico{width:3.2cqw;height:3.2cqw}
+.card h3,.step h3{margin:0;font-family:var(--f-display);font-weight:700;font-size:var(--fs-sub);line-height:1.1}
+.card.alert{border:.2cqw solid var(--r7)}
+
+/* piano */
+.tl{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:3cqw;width:100%}
+.tl::before{content:"";position:absolute;left:2cqw;right:2cqw;top:2cqw;height:.18cqw;background:var(--line)}
+.step{position:relative;display:grid;gap:1.2cqw;align-content:start}
+.dot{width:4cqw;height:4cqw;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font:600 1.61cqw var(--f-mono)}
+.when{font:500 var(--fs-label) var(--f-mono);color:var(--muted)}
+
+/* stampa: una slide per pagina 1600×900 */
+body.pdf{padding:0;background:#fff}
+body.pdf .deck{gap:0;max-width:none}
+body.pdf .cap{display:none}
+body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
+@media print{@page{size:1600px 900px;margin:0}}
+</style>
+</head>
+<body>
+<main class="deck" id="deck"><div class="vuoto">Caricamento dell'analisi…</div></main>
+<script>
+/* ================= MOTORE DEL DECK =================
+   Unico deck per ogni cliente e settore: i numeri arrivano dai dati della zona, i testi si scrivono da soli
+   e si possono correggere a mano (A.testi, chiave → testo). Prima il blocco Google AI Mode, poi Google Maps. */
+(function () {
+  const up = (n) => { n = Math.max(0, Number(n) || 0); const f = Math.floor(n + 1e-9); return n - f > .5 + 1e-9 ? f + 1 : f; };   // X,5 per difetto
+  const it = (n) => up(n).toLocaleString('it-IT');
+  const pc = (a, b) => (b ? it(a / b * 100) : '0') + '%';
+  const heat = (r) => !r || r >= 20 ? 'r7' : r === 1 ? 'r1' : r === 2 ? 'r2' : r === 3 ? 'r3' : r <= 6 ? 'r4' : r <= 10 ? 'r5' : 'r6';
+  const top3 = (g) => g.flat().filter((r) => r && r <= 3).length;
+  const ord = (n, g = 'f') => it(n) + (g === 'm' ? 'º' : 'ª');   // ª con posizione, º con posto
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const elenco = (a) => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1];
+  const zone = (n) => n === 1 ? '1 zona' : n + ' zone';
+  const ICO = {
+    ai: (c) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l2.2 7.8L22 12l-7.8 2.2L12 22l-2.2-7.8L2 12l7.8-2.2z" fill="${c}"/></svg>`,
+    maps: (c) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s-7-7.2-7-12.4A7 7 0 0 1 19 9.6C19 14.8 12 22 12 22z" fill="${c}"/><circle cx="12" cy="9.6" r="2.8" fill="#fff"/></svg>`,
+  };
+
+  function contours(cx, cy, max, step, k) {
+    let s = '';
+    for (let r = step, i = 0; r <= max; r += step, i++) {
+      let d = '';
+      for (let j = 0; j <= 56; j++) { const a = j / 56 * Math.PI * 2, rr = r * (1 + 0.07 * Math.sin(3 * a + k + i * .6) + 0.045 * Math.sin(5 * a - (k + i * .6) * 1.7)); d += (j ? 'L' : 'M') + (cx + rr * Math.cos(a)).toFixed(1) + ' ' + (cy + rr * Math.sin(a)).toFixed(1); }
+      s += `<path d="${d}Z" fill="none" stroke="var(--contour)" stroke-width="${i % 3 === 2 ? .55 : .3}"/>`;
+    }
+    return s;
+  }
+
+  window.disegna = function (A) {
+    const D = A.data, OV = A.testi || {}, B = D.business, G = D.grid, N = G.points, KW = D.kw;
+    const MG = D.mapGrid || { first: .203, step: (1 - 2 * .203) / Math.max(1, G.size - 1) };
+    let gid = 0;
+    /* griglia delle posizioni; bgmap: la mappa reale solo nelle slide con i dati veri */
+    function gridSVG(rows, { hl = null, labels = true, dim = false, deco = true, neutral = false, dims = null, aria = '', bgmap = null } = {}) {
+      const n = rows.length, s = 10, w = n * s, c = w / 2, m = Math.floor(n / 2) * s + s / 2, pd = dims ? 13 : 3, R = bgmap ? 3 : 4.1, fs = bgmap ? 3.3 : 4, hr = bgmap ? 4.6 : 5.8, id = 'mc' + (++gid);
+      let out = `<svg class="grid" viewBox="${-pd} -3 ${w + pd + 3} ${w + pd + 3}" role="img" aria-label="${esc(aria)}">`;
+      if (bgmap) { const k = s / MG.step, ix = s / 2 - MG.first * k;
+        out += `<defs><clipPath id="${id}"><rect x="-3" y="-3" width="${w + 6}" height="${w + 6}"/></clipPath></defs><image href="${bgmap}" x="${ix.toFixed(2)}" y="${ix.toFixed(2)}" width="${k.toFixed(2)}" height="${k.toFixed(2)}" preserveAspectRatio="none" clip-path="url(#${id})"/>`; }
+      else if (deco) out += contours(c, c, w * 0.78, w * 0.065, 1.3);
+      rows.forEach((row, y) => row.forEach((r, x) => {
+        const cx = x * s + s / 2, cy = y * s + s / 2, cls = heat(r), off = dim && hl && !hl(y, x), op = off && !bgmap ? .22 : 1;
+        const fill = neutral ? 'var(--line)' : off && bgmap ? '#E4E7E4' : `var(--${cls})`, ink = off && bgmap ? '#9AA19A' : `var(--${cls}-ink)`;
+        out += `<g opacity="${op}"><circle cx="${cx}" cy="${cy}" r="${R}"${bgmap ? ' stroke="#fff" stroke-width=".5"' : ''} fill="${fill}"/>`;
+        if (labels && r) out += `<text x="${cx}" y="${cy + fs * .36}" text-anchor="middle" font-size="${fs}" font-weight="${bgmap ? 600 : 400}" class="svgt" fill="${ink}">${r > 20 ? '20+' : r}</text>`;
+        out += '</g>';
+      }));
+      out += `<circle cx="${m}" cy="${m}" r="${hr}" fill="none" stroke="var(--home)" stroke-width="1.3"/>`;
+      if (dims) {
+        const a = s / 2, b = w - s / 2, y = w + 6, x = -6, f = (v) => String(v).replace('.', ',');
+        const tk = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--ink)" stroke-width=".4"/>`;
+        out += tk(a, y, b, y) + tk(a, y - 1.6, a, y + 1.6) + tk(b, y - 1.6, b, y + 1.6);
+        out += `<text x="${c}" y="${y + 5.2}" text-anchor="middle" font-size="4.8" font-weight="700" class="svgt" fill="var(--ink)">${f(dims * 2)} km</text>`;
+        out += tk(x, a, x, b) + tk(x - 1.6, a, x + 1.6, a) + tk(x - 1.6, b, x + 1.6, b);
+        out += `<text x="${x - 2.6}" y="${c}" text-anchor="middle" font-size="4.8" font-weight="700" class="svgt" fill="var(--ink)" transform="rotate(-90 ${x - 2.6} ${c})">${f(dims * 2)} km</text>`;
+      }
+      return out + '</svg>';
+    }
+    const mapFig = (rows, aria, size, bg) => `<figure class="lfmap" style="width:${size}cqw;height:${size}cqw"><div class="vec">${gridSVG(rows, { aria, bgmap: bg })}</div></figure>`;
+    const ring = (gr) => { const f = gr.flat(), n = f.length || 1, C = 2 * Math.PI * 48, S = [[f.filter((r) => r && r <= 3).length, 'r2'], [f.filter((r) => r > 3 && r <= 10).length, 'r4'], [f.filter((r) => !r || r > 10).length, 'r7']]; let o = 0, arcs = '';
+      S.forEach(([c, k]) => { if (!c) return; const L = c / n * C; arcs += `<circle cx="60" cy="60" r="48" fill="none" stroke="var(--${k})" stroke-width="12" stroke-dasharray="${L.toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-o).toFixed(1)}" transform="rotate(-90 60 60)"/>`; o += L; });
+      return `<svg class="ring" viewBox="0 0 120 120" role="img" aria-label="${pc(S[0][0], n)} tra le prime 3 posizioni">${arcs}<text x="60" y="69" text-anchor="middle" font-size="26" font-weight="700" class="svgt" fill="var(--ink)">${pc(S[0][0], n)}</text></svg>`; };
+    const legend = () => `<div class="legend">${[['r1', 'r3', 'Visibile', '1–3'], ['r4', 'r5', 'Poco visibile', '4–10'], ['r6', 'r7', 'Invisibile', 'oltre 10 o assenti']].map(([a, z, l, d]) => `<span><s style="background:linear-gradient(90deg,var(--${a}) 50%,var(--${z}) 50%);width:1.6cqw;border-radius:.5cqw"></s><b style="color:var(--ink);font-weight:500">${l}</b>&nbsp;${d}</span>`).join('')}<span style="margin-left:.6cqw"><s style="background:transparent;border:.2cqw solid var(--home);width:1.1cqw;height:1.1cqw"></s>cerchio: la vostra sede</span></div>`;
+    /* terzo più debole della griglia (3×3 settori): media delle posizioni, assenti contati come 21 */
+    function weakest(g) {
+      const n = g.length, k = Math.round(n / 3), b = [[0, k - 1], [k, n - 1 - k], [n - k, n - 1]], R = ['nord', 'centro', 'sud'], C = ['ovest', 'centro', 'est'];
+      let best = null;
+      b.forEach((ry, i) => b.forEach((rx, j) => { let sum = 0, cnt = 0, t3 = 0;
+        for (let y = ry[0]; y <= ry[1]; y++) for (let x = rx[0]; x <= rx[1]; x++) { const r = g[y][x] || 21; sum += r; cnt++; if (r <= 3) t3++; }
+        const mean = sum / cnt;
+        if (!best || mean > best.mean) best = { mean, t3, cnt, ry, rx, name: i === 1 && j === 1 ? 'centro' : i === 1 ? C[j] : j === 1 ? R[i] : R[i] + '-' + C[j] };
+      }));
+      return best;
+    }
+    const inW = (W) => (y, x) => y >= W.ry[0] && y <= W.ry[1] && x >= W.rx[0] && x <= W.rx[1];
+    const freq = (cells) => { const c = {}; cells.forEach((ns) => ns.forEach((n) => (c[n] = (c[n] || 0) + 1))); return Object.entries(c).sort((a, b) => b[1] - a[1]); };
+
+    /* piattaforme presenti: prima AI Mode, poi Maps */
+    const PF = {};
+    [['ai', 'Google AI Mode', 'AI Mode'], ['maps', 'Google Maps', 'Maps']].forEach(([k, lab, short]) => {
+      const p = D[k]; if (!p || !p.grid || !p.grid.length) return;
+      const W = weakest(p.grid), C = p.comp, ME = C.find((c) => c.me) || { v: 0, pos: C.length + 1 }, lead = ME.pos === 1;
+      const L0 = C[0], RU = lead ? C.filter((c) => !c.me && up(c.v) === up(C[1] ? C[1].v : 0)) : [];
+      const cellsW = p.grid.flatMap((r, y) => r.map((_, x) => [y, x])).filter(([y, x]) => inW(W)(y, x));
+      PF[k] = { k, lab, short, ...p, pts: p.grid.flat().length, W, ME, lead, L0, RU, t3: top3(p.grid),
+        wNames: freq(cellsW.map(([y, x]) => p.names[y][x])), wFound: cellsW.map(([y, x]) => p.grid[y][x]).filter(Boolean) };
+    });
+    const ORDER = Object.keys(PF);
+    if (!ORDER.length) { document.getElementById('deck').innerHTML = '<div class="vuoto">Questa zona non ha ancora una griglia: importa la scansione.</div>'; return { base: {}, chiavi: [] }; }
+    const AI = PF.ai, MP = PF.maps, P0 = PF[ORDER[0]];
+    const svc = B.service || `«${KW}»`;
+    const n0 = (n) => Math.floor(G.size / 2);   // centro della griglia: la sede
+    const sedeAI = AI ? AI.grid[n0()][n0()] : null;
+    const lost = AI && MP ? MP.grid.flat().filter((r, i) => r && r <= 3 && !(AI.grid.flat()[i] && AI.grid.flat()[i] <= 3)).length : 0;
+    const lostFirst = AI && MP ? freq(MP.grid.flatMap((r, y) => r.map((m, x) => (m && m <= 3 && !(AI.grid[y][x] && AI.grid[y][x] <= 3)) ? AI.names[y][x].slice(0, 1) : [])))[0] : null;
+    const weakerPF = AI && MP ? (AI.t3 <= MP.t3 ? AI : MP) : P0;
+
+    /* ---------- testi di base: si scrivono dai numeri, ognuno si può correggere ---------- */
+    const base = {};
+    const add = (k, v) => (base[k] = v);
+    add('nome', B.name);
+    add('coverSub', `Come vi trova chi cerca ${svc} su ${ORDER.map((k) => PF[k].lab).join(' e ')}`);
+    add('methodTitle', `Abbiamo cercato «${KW}» da ${N} punti intorno alla vostra sede`);
+    add('methodTxt', `Il ${D.scanDate}, da ognuno dei ${N} punti di una griglia di ${String(G.radiusKm * 2).replace('.', ',')}×${String(G.radiusKm * 2).replace('.', ',')} km intorno alla vostra sede, abbiamo eseguito la stessa ricerca che farebbe un potenziale cliente${AI ? ' su Google AI Mode (le risposte generate dall’intelligenza artificiale di Google) e' : ''} su Google Maps, verificando con dati pubblici di Google, non pubblicitari, in che posizione comparite strada per strada.`);
+    ORDER.forEach((k) => { const f = PF[k], sfx = k === 'maps' ? 'Maps' : '', gap = f.lead ? up(f.ME.v) - up(f.RU.length ? f.RU[0].v : 0) : up(f.L0.v) - up(f.ME.v);
+      add('heroTitle' + sfx, f.lead ? `Su ${f.lab} nessuno compare nelle prime 3 posizioni più spesso di voi`
+        : f.ME.pos === 2 ? `Su ${f.lab} un’attività compare nelle prime 3 posizioni più spesso di voi` : `Su ${f.lab} ${f.ME.pos - 1} attività compaiono nelle prime 3 posizioni più spesso di voi`);
+      add('heroTxt' + sfx, (f.lead ? (f.RU.length ? `${elenco(f.RU.map((c) => c.n))} ${f.RU.length > 1 ? 'vi seguono' : 'vi segue'} al ${it(f.RU[0].v)}%, a ${gap} punti.` : 'Nessun’altra attività compare nelle prime 3 posizioni.')
+        : `${f.L0.n} è nelle prime 3 posizioni nel ${it(f.L0.v)}% dei punti, voi nel ${it(f.ME.v)}%: ${gap} punti di distacco.`)
+        + (k === 'ai' ? ' Sono le risposte che chi cerca legge per prime.' : ' Sono le posizioni che Google mostra subito, senza far scorrere la pagina.'));
+      add('weakTitle' + sfx, f.W.t3 === f.W.cnt ? `Su ${f.short} siete tra i primi 3 anche nella zona più debole`
+        : f.W.t3 === 0 ? `A ${f.W.name}, su ${f.short}, chi cerca ${svc} trova prima le altre` : `A ${f.W.name}, su ${f.short}, siete tra i primi 3 solo in ${zone(f.W.t3)} su ${f.W.cnt}`);
+      const wn = f.wNames.slice(0, 3);
+      add('weakTxt' + sfx, wn.length ? `Qui i primi 3 posti vanno più spesso a ${elenco(wn.map(([n, c]) => `${n} (${zone(c)})`))}.` : `Qui ${f.short} non mostra nessuno nelle prime 3 posizioni.`);
+      add('compTitle' + sfx, f.lead ? (f.RU.length ? `Su ${f.short} ${f.RU[0].n} è a ${gap} punti da voi` : `Su ${f.short} siete gli unici nelle prime 3 posizioni`) : `Su ${f.short} ${f.L0.n} vi precede di ${gap} punti`);
+    });
+    if (AI && MP) {
+      add('aiTitle', `Tra le prime 3 posizioni nel ${pc(AI.t3, AI.pts)} dei punti su Google AI Mode e nel ${pc(MP.t3, MP.pts)} su Maps`);
+      add('aiTxt', (lost ? `In ${zone(lost)} Google Maps vi mette tra i primi 3 e AI Mode no. ` : '') + (sedeAI ? `Dalla vostra sede AI Mode vi cita al ${ord(sedeAI, 'm')} posto.` : 'Dalla vostra sede AI Mode non vi cita.'));
+    }
+    /* punti deboli: al massimo 3, in ordine di peso; la scheda non rivendicata va sempre per prima */
+    const cards = [];
+    if (B.unclaimed) cards.push(['Scheda Google non rivendicata', 'Nessuno la gestisce: non potete rispondere alle recensioni né correggere orari e categoria.', 'Effetto: chiunque può proporre modifiche alla vostra scheda.', 1, true]);
+    if (AI && (!sedeAI || sedeAI > 3)) { const av = AI.names[n0()][n0()].slice(0, 3);
+      cards.push([sedeAI ? `Dalla vostra sede, su AI Mode siete al ${ord(sedeAI, 'm')} posto` : 'Dalla vostra sede AI Mode non vi cita', av.length ? `L’intelligenza artificiale di Google cita prima ${elenco(av)}.` : 'L’intelligenza artificiale di Google cita prima altre attività.', `Effetto: vicino alla sede chi chiede ad AI Mode legge ${av.length > 1 ? av.length + ' nomi' : 'un nome'} prima del vostro.`, 0]); }
+    if (lost) cards.push([`${zone(lost)} perse passando ad AI Mode`, `In ${zone(lost)} Google Maps vi mette tra i primi 3, le risposte di AI Mode no.`, lostFirst ? `Effetto: in quelle zone il primo nome citato è più spesso ${lostFirst[0]} (${zone(lostFirst[1])}).` : 'Effetto: in quelle zone chi chiede ad AI Mode trova prima i concorrenti.', 0]);
+    if (MP && B.rv != null) { const cr = MP.comp.filter((c) => !c.me && c.rv != null).sort((a, b) => b.rv - a.rv)[0];
+      if (cr && cr.rv > Math.max(10, B.rv * 1.5)) cards.push([`${B.rv} recensioni contro ${cr.rv}`, `${cr.n} ne ha ${cr.rv} e su Maps è tra i primi 3 nel ${it(cr.v)}% delle zone.`, 'Effetto: chi confronta le schede vede più giudizi sui concorrenti.', 2]); }
+    ORDER.forEach((k) => { const f = PF[k]; if (f.W.t3 < f.W.cnt) cards.push([`Zona ${f.W.name}: ${f.short} vi mette tra i primi 3 in ${zone(f.W.t3)} su ${f.W.cnt}`, f.wNames.length ? `Lì i primi posti vanno più spesso a ${elenco(f.wNames.slice(0, 2).map(([n]) => n))}.` : 'Lì compaiono altre attività.', 'Effetto: chi cerca da quella zona chiama prima un concorrente.', k === 'ai' ? 0 : 2]); });
+    cards.slice(0, 3).forEach((c, i) => { add(`card${i + 1}t`, c[0]); add(`card${i + 1}c`, c[1]); add(`card${i + 1}e`, c[2]); });
+    const cardMeta = cards.slice(0, 3).map((c) => ({ ico: c[3], alert: !!c[4] }));
+    add('cardsTitle', cardMeta.length === 3 ? 'Tre punti deboli da sistemare' : cardMeta.length === 2 ? 'Due punti deboli da sistemare' : 'Il punto debole da sistemare');
+    add('ctaTitle', 'Allarghiamo la zona in cui vi trovano per primi');
+    add('ctaSub', `Partiamo da ${weakerPF.short} e dalla zona ${weakerPF.W.name}. Tra 60 giorni misuriamo il risultato con la stessa griglia di ${N} punti.`);
+    add('planTitle', 'Tre passi per allargare la zona in cui vi trovano per primi');
+    add('step1', AI ? 'Recuperare AI Mode' : 'Recuperare le prime posizioni');
+    add('step1txt', 'Pagina del sito con zone servite, servizi e informazioni che l’intelligenza artificiale di Google può leggere e citare.');
+    add('step2', `Recuperare la zona ${weakerPF.W.name}`);
+    add('step2txt', 'Recensioni dei clienti, post con le novità, foto della sede, risposta a ogni giudizio.');
+    add('step3', 'Completare la scheda Google');
+    add('step3txt', 'Categorie, servizi e orari completi; verifica della proprietà della scheda, se serve.');
+    add('planNote', 'Dopo 60 giorni ripetiamo la stessa scansione e confrontiamo le mappe.');
+    const T = {}; Object.keys(base).forEach((k) => (T[k] = (OV[k] != null && String(OV[k]).trim() !== '') ? String(OV[k]) : base[k]));
+    const H = (k) => esc(T[k]);
+    const firma = D.firma || {}, SIGN = [firma.nome || 'Hector Rinaldi', firma.telefono || '+39 351 894 2667', firma.email || 'hector.rinaldi@italiaonline.it'];
+
+    /* ---------- slide ---------- */
+    let CUR = null, SHOWN = [];
+    const footHTML = (n) => `<div class="foot"><span>${H('nome')} · analisi del ${esc(D.scanDate)}</span><span>${String(n).padStart(2, '0')} / ${SHOWN.length}</span></div>`;
+    const frame = (n, eyebrow, title, body) => `<div class="slide"><div class="sl${CUR && CUR.legend ? ' withleg' : ''}">
+      <div><div class="eyebrow"><i></i>${eyebrow}</div>${title ? `<h2 class="title">${title}</h2>` : ''}</div>
+      ${body}
+      ${CUR && CUR.legend ? `<div class="legrow">${legend()}</div>` : ''}
+      ${footHTML(n)}</div></div>`;
+    const pfTag = (f) => `<span class="pf">${ICO[f.k]('var(--ink)')}${f.lab}</span>`;
+    const sfx = (f) => (f.k === 'maps' ? 'Maps' : '');
+    const S_HERO = (f) => ({ g: f.k, cap: 'Il dato forte · ' + f.lab, legend: true, f: (n) => frame(n, `${pfTag(f)} · «${esc(KW)}»`, H('heroTitle' + sfx(f)),
+      `<div class="body" style="grid-template-columns:minmax(0,1fr) auto">
+        <div style="display:grid;gap:1.4cqw;align-content:center">
+          <div style="display:flex;gap:4cqw;align-items:flex-end;flex-wrap:wrap">
+            <div style="display:grid;gap:1cqw"><div class="lab">punti nelle prime 3 posizioni</div><div class="big" style="color:${up(f.t3 / f.pts * 100) <= 10 ? 'var(--r7)' : 'var(--accent)'}">${it(f.t3 / f.pts * 100)}<span class="unit">%</span></div></div>
+            ${f.arp ? `<div style="display:grid;gap:1cqw"><div class="lab">${f.found < f.pts ? 'posizione media dove comparite' : 'posizione media'}</div><div class="big" style="color:var(--ink)">${ord(f.arp)}</div></div>` : ''}
+          </div>
+          <div class="txt">${H('heroTxt' + sfx(f))}</div>
+        </div>
+        ${mapFig(f.grid, 'Mappa ' + f.lab, 29, D.mapImg)}
+      </div>`) });
+    const S_WEAK = (f) => ({ g: f.k, cap: 'La zona scoperta · ' + f.lab, legend: true, f: (n) => frame(n, `${pfTag(f)} · «${esc(KW)}»`, H('weakTitle' + sfx(f)),
+      `<div class="body" style="grid-template-columns:auto 1fr">
+        <div class="mapbox" style="justify-self:start;width:29cqw;height:29cqw">${gridSVG(f.grid, { dim: true, bgmap: D.mapImg, hl: inW(f.W), aria: 'Zona più debole' })}</div>
+        <div style="display:grid;gap:2cqw;align-content:center">
+          <span class="lab">zona più debole: ${f.W.name} · punti nelle prime 3 posizioni</span>
+          <div class="big" style="font-size:6.4cqw;color:var(--r7)">${pc(f.W.t3, f.W.cnt)}</div>
+          <div class="kv"><div><span class="lab">zone in cui comparite</span><b>${f.wFound.length} su ${f.W.cnt}</b></div><div><span class="lab">posizione migliore in zona</span><b>${f.wFound.length ? ord(Math.min(...f.wFound)) : 'assenti'}</b></div></div>
+          <div class="txt neg">${H('weakTxt' + sfx(f))}</div>
+        </div>
+      </div>`) });
+    const S_COMP = (f) => ({ g: f.k, cap: 'Chi la precede su Google · ' + f.lab, f: (n) => { const C = f.comp, mi = C.findIndex((c) => c.me), rows = C.length <= 6 || mi < 6 ? C.slice(0, 6) : [...C.slice(0, 5), C[mi]];
+      const L0 = f.L0, gap = f.lead ? up(f.ME.v) - up(f.RU.length ? f.RU[0].v : 0) : up(L0.v) - up(f.ME.v);
+      return frame(n, `Chi la precede su ${pfTag(f)} · «${esc(KW)}»`, H('compTitle' + sfx(f)),
+      `<div class="body" style="grid-template-columns:1fr 27cqw;align-items:start">
+        <div class="cmp">
+          <div class="cmp-h"><span>Attività</span><span>Quota di punti nelle prime 3 posizioni</span></div>
+          ${rows.map((c, i) => `${i === 3 ? `<div class="top3sep">dal ${ord(4, 'm')} posto in classifica</div>` : ''}<div class="cmp-r ${c.me ? 'me' : ''}">
+            <span class="pill rk ${c.me ? 'me' : ''}">${c.pos}</span><span class="n">${esc(c.me && B.short ? B.short : c.n)}${c.me ? '<span class="youtag">voi</span>' : ''}</span>
+            <span class="trk"><span class="fill ${c.me ? 'me' : ''}" style="width:${Math.min(100, c.v).toFixed(1)}%"></span></span>
+            <span class="val"><b>${it(c.v)}%</b></span></div>`).join('')}
+        </div>
+        <div class="panel duel">
+          <span class="lab">${f.lead ? 'Distacco dal secondo' : 'Distacco dal primo'}</span>
+          <div style="font-family:var(--f-display);font-weight:700;font-size:3.4cqw;line-height:1;color:${f.lead ? 'var(--accent)' : 'var(--r7)'}">${gap} punti</div>
+          <div>${f.lead ? (f.RU.length ? 'di vantaggio su ' + esc(f.RU[0].n) : 'di vantaggio') : 'di distacco da ' + esc(L0.n)}</div>
+          <div class="gap">Attività che compaiono almeno una volta nelle prime 3 posizioni: <b>${f.active} su ${f.total}</b></div>
+        </div>
+      </div>`); } });
+
+    const pin = (cls, num, ringOnly) => `<svg viewBox="0 0 24 24" class="hpin" aria-hidden="true">${ringOnly ? '<circle cx="12" cy="12" r="10" fill="none" stroke="var(--home)" stroke-width="2.4"/>' : `<circle cx="12" cy="12" r="10" fill="var(--${cls})"/>`}${num ? `<text x="12" y="16" text-anchor="middle" font-size="10" class="svgt" fill="var(--${cls}-ink)">${num}</text>` : ''}</svg>`;
+    const cover = (first, inner) => `<div class="slide cover${first ? ' first' : ''}"><div class="cover-bg">${gridSVG(P0.grid, { labels: false, aria: 'Motivo griglia' })}</div><div class="sl">${inner}</div></div>`;
+    const SLIDES = [
+      { g: 'spiegazione', cap: 'Copertina', f: () => cover(true, `<div class="eyebrow"><i></i>Analisi visibilità locale</div>
+        <div style="display:grid;gap:1.6cqw;align-content:center">
+          <h1 class="cover-name" style="font-size:${T.nome.length <= 18 ? 6.6 : T.nome.length <= 30 ? 5.5 : T.nome.length <= 45 ? 4.9 : 4}cqw">${H('nome')}</h1>
+          <div class="txt" style="max-width:40cqw">${H('coverSub')}</div>
+        </div>`) },
+      /* spiegazione: griglia su fondo neutro, senza la mappa Google */
+      { g: 'spiegazione', cap: 'Come abbiamo misurato', f: (n) => frame(n, 'Metodo', H('methodTitle'),
+        `<div class="body" style="grid-template-columns:1fr 29cqw">
+          <div style="display:grid;gap:2.4cqw">
+            <div class="kv"><div><span class="lab">punti di ricerca</span><b>${N}</b></div><div><span class="lab">griglia</span><b>${G.size}×${G.size}</b></div><div><span class="lab">raggio</span><b>${String(G.radiusKm).replace('.', ',')} km</b></div></div>
+            <div class="txt">${H('methodTxt')}</div>
+          </div>
+          <div class="mapbox" style="width:29cqw;height:29cqw">${gridSVG(P0.grid, { labels: false, neutral: true, dims: G.radiusKm, aria: 'Schema della griglia' })}</div>
+        </div>`) },
+      { g: 'spiegazione', cap: 'Come leggere le mappe', f: (n) => frame(n, 'Guida alla lettura', 'Come leggere le mappe',
+        `<div class="body" style="grid-template-columns:auto minmax(0,1fr);gap:4cqw">
+          ${mapFig([[2, 5, 12], [1, 1, 0], [3, 8, 15]], 'Esempio di griglia', 30, null)}
+          <div style="display:grid;gap:1.4cqw;align-content:center">
+            <div class="txt" style="max-width:none">Ogni pallino corrisponde a una ricerca fatta da quel punto geografico. Il numero è la vostra posizione nei risultati.</div>
+            <div class="howto">${[[pin('r1', 1), 'Visibile', 'Comparite tra le prime 3 posizioni, quelle che Google mostra subito.'], [pin('r4', 5), 'Poco visibile', 'Comparite dalla 4ª alla 10ª posizione: chi cerca deve scorrere la pagina per trovarvi.'], [pin('r6', 12), 'Invisibile', 'Comparite oltre la 10ª posizione, dove difficilmente qualcuno arriva.'], [pin('r7', 0), 'Assenti', 'Il pallino rosso senza numero: in quel punto non comparite.'], [pin('', 0, true), 'La vostra sede', 'Il cerchio blu segna il centro della griglia.']].map(([p, t, d]) => `<div class="hrow">${p}<div><b>${t}:</b> <span>${d}</span></div></div>`).join('')}</div>
+          </div>
+        </div>`) },
+      ...ORDER.flatMap((k) => [S_HERO(PF[k]), S_WEAK(PF[k]), S_COMP(PF[k])]),
+      ...(AI && MP ? [{ g: 'chiusura', cap: 'Google AI Mode contro Google Maps', legend: true, f: (n) => frame(n, 'Google AI Mode contro Google Maps', H('aiTitle'),
+        `<div class="body" style="grid-template-rows:auto auto;gap:1.6cqw;align-content:center">
+          <div class="twin">${[AI, MP].map((f) => `<div class="tcol"><div class="ph">${ICO[f.k]('var(--ink)')}${f.lab}</div>${mapFig(f.grid, 'Mappa ' + f.lab, 21, D.mapImg)}
+            <div class="tstat">${ring(f.grid)}<div><span class="lab">tra le prime 3 posizioni</span><b>${f.t3} su ${f.pts}</b></div></div></div>`).join('')}</div>
+          ${T.aiTxt ? `<div class="txt" style="max-width:none">${H('aiTxt')}</div>` : ''}
+        </div>`) }] : []),
+      ...(cardMeta.length ? [{ g: 'chiusura', cap: 'Cosa frena la scheda', f: (n) => { const ico = (k) => `<svg class="ico" viewBox="0 0 40 40" aria-hidden="true">${[
+          '<circle cx="20" cy="20" r="15" fill="none" stroke="var(--accent)" stroke-width="3"/><path d="M5 20h30M20 5c6 6 6 24 0 30M20 5c-6 6-6 24 0 30" fill="none" stroke="var(--accent)" stroke-width="2"/>',
+          '<path d="M20 4l13 6v9c0 9-6 15-13 17C13 34 7 28 7 19v-9z" fill="none" stroke="var(--accent)" stroke-width="3"/><path d="M14 20l4 4 8-9" fill="none" stroke="var(--accent)" stroke-width="3"/>',
+          '<path d="M20 36s-11-11-11-19a11 11 0 0 1 22 0c0 8-11 19-11 19z" fill="none" stroke="var(--accent)" stroke-width="3"/><circle cx="20" cy="17" r="4" fill="none" stroke="var(--accent)" stroke-width="3"/>'][k]}</svg>`;
+        return frame(n, 'Diagnosi della scheda Google', H('cardsTitle'),
+          `<div class="body"><div class="cards" style="grid-template-columns:repeat(${cardMeta.length},1fr)">${cardMeta.map((c, i) => `<div class="panel card${c.alert ? ' alert' : ''}">${ico(c.ico)}<h3>${H(`card${i + 1}t`)}</h3><div>${H(`card${i + 1}c`)}</div><div class="eff">${H(`card${i + 1}e`)}</div></div>`).join('')}</div></div>`); } }] : []),
+      { g: 'chiusura', cap: 'Chiusura', f: (n) => cover(false, `<div class="eyebrow"><i></i>Prossimo passo</div>
+        <div style="display:grid;gap:1.6cqw;align-content:center"><h2 class="cover-name" style="font-size:5.29cqw">${H('ctaTitle')}</h2><div class="txt">${H('ctaSub')}</div></div>
+        <div class="contact"><div><b class="cname">${esc(SIGN[0])}</b></div>
+          <div class="cline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1z" fill="var(--accent)"/></svg>${esc(SIGN[1])}</div>
+          <div class="cline"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3z" fill="none" stroke="var(--accent)" stroke-width="2"/><path d="M3 6l9 7 9-7" fill="none" stroke="var(--accent)" stroke-width="2"/></svg>${esc(SIGN[2])}</div></div>
+        ${footHTML(n)}`) },
+      { g: 'interne', internal: true, cap: 'Il piano · interna, esclusa dal PDF', f: (n) => frame(n, 'Piano di lavoro', H('planTitle'),
+        `<div class="body"><div class="tl">${[1, 2, 3].map((i) => `<div class="step"><div class="dot">${i}</div><span class="when">${['settimane 1–4', 'mesi 1–2', 'mesi 2–3'][i - 1]}</span><h3>${H('step' + i)}</h3><div>${H('step' + i + 'txt')}</div></div>`).join('')}</div>
+          <div class="lab plain">${H('planNote')}</div></div>`) },
+    ];
+    const filtro = A.filtro || 'tutte';
+    SHOWN = SLIDES.filter((s) => (A.pdf ? !s.internal : true));
+    const vis = SHOWN.map((s, i) => [s, i]).filter(([s]) => filtro === 'tutte' || s.g === filtro);
+    document.body.classList.toggle('pdf', !!A.pdf);
+    document.getElementById('deck').innerHTML = vis.map(([s, i]) => { CUR = s; return `<section><p class="cap">${String(i + 1).padStart(2, '0')} · ${s.cap}</p><div class="skin-a">${s.f(i + 1)}</div></section>`; }).join('') || '<div class="vuoto">Nessuna slide in questo gruppo.</div>';
+    return { base, slide: SHOWN.length };
+  };
+  /* PDF dal motore: i dati arrivano già nella pagina */
+  if (window.ANALISI) window.disegna(window.ANALISI);
+})();
+</script>
+</body>
+</html>

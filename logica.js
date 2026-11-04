@@ -249,5 +249,50 @@
     };
   };
 
+  /* ---------- analisi dedicata (deck 16:9): dati per motore/analisi.html ---------- */
+  /* righe della griglia da nord a sud, colonne da ovest a est (stesso ordine delle mappe dell'app) */
+  L.righe = (z, campo = 'punti') => {
+    const pt = z.punti || []; const n = z.meta.griglia || Math.round(Math.sqrt(pt.length));
+    const idx = pt.map((_, i) => i).sort((a, b) => (pt[b][0] - pt[a][0]) || (pt[a][1] - pt[b][1]));
+    const rows = []; for (let i = 0; i < idx.length; i += n) rows.push(idx.slice(i, i + n).sort((a, b) => pt[a][1] - pt[b][1]));
+    return rows;
+  };
+  const nomeId = (z, id) => { if (String(id).startsWith('~')) return String(id).slice(1); const a = z.attivita[id] || {}; return String(a.b || a.n || '').replace(/(\s+(di|del|della|dei|e|&|-|geom\.?))+\s*$/i, '').replace(/\bS\.?\s?R\.?\s?L\.?(?=\s|$)/gi, 'srl').replace(/\bS\.?\s?A\.?\s?S\.?(?=\s|$)/gi, 's.a.s.').replace(/\bS\.?\s?N\.?\s?C\.?(?=\s|$)/gi, 's.n.c.').trim(); };
+  /* quota di punti nelle prime 3 posizioni di ogni attività, dalla più presente */
+  const classificaQuota = (z, campo, pid) => {
+    const punti = z[campo] || []; const N = punti.length; const t3 = {}; const tutti = new Set();
+    punti.forEach(([, , r]) => r.forEach((id, i) => { tutti.add(id); if (i < 3) t3[id] = (t3[id] || 0) + 1; }));
+    const ar = Object.entries(t3).map(([id, c]) => ({ id, n: nomeId(z, id), v: c / N * 100, rv: (z.attivita[id] || {}).rv ?? null, me: id === pid }))
+      .sort((a, b) => b.v - a.v || a.n.localeCompare(b.n));
+    if (!ar.some((c) => c.me)) ar.push({ id: pid, n: nomeId(z, pid), v: 0, rv: (z.attivita[pid] || {}).rv ?? null, me: true });
+    ar.forEach((c, i) => (c.pos = i + 1));
+    const mi = ar.findIndex((c) => c.me);
+    const lista = mi < 7 ? ar.slice(0, 7) : [...ar.slice(0, 6), ar[mi]];
+    return { lista, attive: Object.keys(t3).length, totali: tutti.size };
+  };
+  L.datiAnalisi = (z, pid, opz = {}) => {
+    const a = z.attivita[pid] || {}; const m = z.meta; const rows = L.righe(z);
+    const griglia = (campo) => rows.map((r) => r.map((i) => { const k = ((z[campo] || [])[i] || [, , []])[2].indexOf(pid); return k < 0 ? 0 : k + 1; }));
+    const nomi = (campo) => rows.map((r) => r.map((i) => ((z[campo] || [])[i] || [, , []])[2].slice(0, 3).filter((id) => id !== pid).map((id) => nomeId(z, id))));
+    const piatta = (campo) => { const mm = L.metriche(z, pid, campo); const cl = classificaQuota(z, campo, pid);
+      return { grid: griglia(campo), names: nomi(campo), arp: mm.arp, found: mm.top20, comp: cl.lista, active: cl.attive, total: cl.totali }; };
+    const lato = parseFloat(String(m.lato || '').replace(',', '.')) || 4;
+    return {
+      business: { name: opz.nome || a.n || '', short: opz.breve || a.b || '', service: m.frase_kw || '', address: a.a || '',
+        unclaimed: a.c === false && !!a.cv, rv: a.rv ?? null },
+      scanDate: m.data_testo || m.data || '', kw: m.keyword || '',
+      grid: { size: m.griglia || rows.length, radiusKm: lato / 2, points: (z.punti || []).length, aiPoints: L.haAI(z) ? z.punti_ai.length : 0 },
+      maps: piatta('punti'), ai: L.haAI(z) ? piatta('punti_ai') : null,
+      firma: opz.firma || null,
+    };
+  };
+  /* chiave breve e stabile dell'attività per i file dell'analisi (zone/<id>/analisi/<chiave>-…) */
+  L.chiaveAnalisi = (pid) => String(pid).replace(/[^A-Za-z0-9]/g, '').slice(-12);
+  L.fileAnalisi = (z, pid, data) => {
+    const d = (data || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(new Date())).replace(/-/g, '').slice(2);
+    const a = z.attivita[pid] || {}; const cc = (s) => String(s || '').split(/[^\p{L}\p{N}]+/u).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join('');
+    return `${d}-${cc(z.meta.categoria) || 'Analisi'}-${cc(z.meta.quartiere)}-${cc(a.n).slice(0, 40)}-Analisi`;
+  };
+
   if (typeof module !== 'undefined' && module.exports) module.exports = L; else root.L = L;
 })(typeof window !== 'undefined' ? window : globalThis);

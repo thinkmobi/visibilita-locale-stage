@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.33.0';
+const VERSIONE = '0.34.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -81,9 +81,10 @@ const ESITO_AZIONE = { 'Nessuna risposta': ['Richiamare', 1], 'Chiuso': ['Ripass
 const PRIORITA = ['1 Caldo', '2 Tiepido', '0 Invisibile', '3 Rete'];   // ordine di lavoro: prima i caldi
 const PRODOTTI = ['GBP SEO', 'SEO locale', 'AI SEO', 'InRete', 'Scheda PagineGialle', 'PgCasa', 'TuttoCittà', 'Display', 'Pacchetto misto'];
 const RETI = /tecnocasa|tecnorete|tempoagency|gabetti|tempocasa|re\/?max|engel|century ?21|grimaldi|coldwell|toscano|professionecasa|frimm|soloaffitti|fondocasa|affiliato|franchising/i;
-const MOTORE = ['motore/report.py', 'motore/foglio.py', 'motore/importa.py', 'motore/siti.py', 'motore/requirements.txt', 'motore/salva.sh', 'motore/esegui_import.sh', 'motore/esegui_report.sh', 'motore/esegui_siti.sh',
+const MOTORE = ['motore/report.py', 'motore/foglio.py', 'motore/analisi.py', 'motore/analisi.html', 'motore/esegui_analisi.sh', 'motore/requirements-analisi.txt',
+  ...['roboto', 'roboto-condensed', 'roboto-mono'].flatMap((d) => (d === 'roboto' ? [400, 500, 600, 700] : d === 'roboto-condensed' ? [500, 700] : [400, 500, 700]).flatMap((w) => ['latin', 'latin-ext'].map((sub) => `motore/fonts/${d}-${sub}-${w}-normal.woff2`))), 'motore/importa.py', 'motore/siti.py', 'motore/requirements.txt', 'motore/salva.sh', 'motore/esegui_import.sh', 'motore/esegui_report.sh', 'motore/esegui_siti.sh',
   ...['PlexCond-Bold', 'PlexCond-SemiBold', 'PlexMono-Bold', 'PlexMono-Medium', 'PlexMono-Regular', 'PlexSans-Bold', 'PlexSans-Medium', 'PlexSans-Regular', 'PlexSans-SemiBold', 'DejaVuSans'].map((f) => `motore/fonts/${f}.ttf`)];
-const WORKFLOW = { 'motore/workflows/report.yml': '.github/workflows/report.yml', 'motore/workflows/importa.yml': '.github/workflows/importa.yml', 'motore/workflows/siti.yml': '.github/workflows/siti.yml' };
+const WORKFLOW = { 'motore/workflows/report.yml': '.github/workflows/report.yml', 'motore/workflows/importa.yml': '.github/workflows/importa.yml', 'motore/workflows/siti.yml': '.github/workflows/siti.yml', 'motore/workflows/analisi.yml': '.github/workflows/analisi.yml' };
 
 const ST = { cfg: {}, zone: {}, conf: { firma: {} }, sync: { stato: 'loc', msg: 'Locale' }, f: { stato: 'aperti', prio: '', zona: '', q: '', kpi: '', pg: '' }, giroData: null, fg: { tappa: '', prio: '' }, timer: {}, pdf: {}, pdfMsg: {} };
 
@@ -323,7 +324,7 @@ function avvisoAmbiente() {
 function render() {
   const [vista, a, b] = (location.hash.slice(1) || 'oggi').split('/');
   // indirizzo sconosciuto (vecchio segnalibro, errore di battitura): si torna a Oggi invece di lasciare la vista precedente
-  if (!VISTE[vista] && vista !== 'p' && vista !== 'z') { location.replace('#oggi'); return; }
+  if (!VISTE[vista] && vista !== 'p' && vista !== 'z' && vista !== 'an') { location.replace('#oggi'); return; }
   document.querySelectorAll('.tab a').forEach((x) => x.classList.toggle('on', x.dataset.t === vista));
   document.body.classList.toggle('largo', vista === 'tabella');
   $('#titolo').textContent = TITOLI[vista] || 'Visibilità';
@@ -336,6 +337,7 @@ function render() {
   ST.restaScroll = false;
   if (vista === 'p' && a && b) apriProspect(a, b);
   if (vista === 'z' && a) apriZona(a);
+  if (vista === 'an' && a && b) apriAnalisi(a, decodeURIComponent(b));
 }
 document.addEventListener('focusout', () => setTimeout(() => { if (ST.daRender && $('#foglio').hidden && !(document.activeElement && $('#vista').contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))) { ST.daRender = false; ST.restaScroll = true; render(); } }, 50));
 // iOS: con html/body bloccati, la tastiera a volte lascia la pagina spostata in alto
@@ -571,6 +573,90 @@ function sezioneAI(z, p) {
   <div class="stat"><div><span>tra le prime 3</span><b class="c-${L.colorePct(pc(a.top3))}">${a.top3}/${a.N}<small>${pc(a.top3)}%</small></b></div></div>
   <div class="mt">${minigriglia(z, p.pid, { ai: true })}</div>`;
 }
+/* ---------- analisi dedicata: deck 16:9 di un'attività della zona (motore/analisi.html) ---------- */
+const ETIC_TESTI = { nome: 'Nome in copertina', coverSub: 'Copertina · sottotitolo', methodTitle: 'Metodo · titolo', methodTxt: 'Metodo · testo',
+  heroTitle: 'AI Mode · dato forte · titolo', heroTxt: 'AI Mode · dato forte · testo', weakTitle: 'AI Mode · zona scoperta · titolo', weakTxt: 'AI Mode · zona scoperta · testo', compTitle: 'AI Mode · chi la precede · titolo',
+  heroTitleMaps: 'Maps · dato forte · titolo', heroTxtMaps: 'Maps · dato forte · testo', weakTitleMaps: 'Maps · zona scoperta · titolo', weakTxtMaps: 'Maps · zona scoperta · testo', compTitleMaps: 'Maps · chi la precede · titolo',
+  aiTitle: 'AI Mode contro Maps · titolo', aiTxt: 'AI Mode contro Maps · testo', cardsTitle: 'Punti deboli · titolo',
+  card1t: 'Punto debole 1 · titolo', card1c: 'Punto debole 1 · causa', card1e: 'Punto debole 1 · effetto', card2t: 'Punto debole 2 · titolo', card2c: 'Punto debole 2 · causa', card2e: 'Punto debole 2 · effetto',
+  card3t: 'Punto debole 3 · titolo', card3c: 'Punto debole 3 · causa', card3e: 'Punto debole 3 · effetto', ctaTitle: 'Chiusura · titolo', ctaSub: 'Chiusura · testo',
+  planTitle: 'Piano (interno) · titolo', step1: 'Piano · passo 1', step1txt: 'Piano · passo 1 · testo', step2: 'Piano · passo 2', step2txt: 'Piano · passo 2 · testo', step3: 'Piano · passo 3', step3txt: 'Piano · passo 3 · testo', planNote: 'Piano · nota' };
+/* scelta dell'attività dalla zona: prima la più vicina al centro della griglia (di solito la scheda su cui è centrata la scansione) */
+function sceltaAnalisi(zid) {
+  const z = ST.zone[zid].z, m = z.meta;
+  const ar = Object.entries(z.attivita || {}).map(([pid, a]) => ({ pid, a, d: a.la != null && m.lat != null ? L.dist(m.lat, m.lng, a.la, a.lo) : 1e9 })).sort((x, y) => x.d - y.d);
+  const f = apriFoglio('Analisi dedicata · scegli l\'attività', `<input class="cerca" id="anQ" placeholder="Cerca…"><div class="lista mt" id="anL"></div>`, () => apriZona(zid));
+  const lista = () => { const q = $('#anQ').value.toLowerCase(); $('#anL').innerHTML = ar.filter((x) => (x.a.n || '').toLowerCase().includes(q)).slice(0, 80)
+    .map((x, i) => `<a class="card" style="display:block" href="#an/${zid}/${encodeURIComponent(x.pid)}"><div class="nome">${esc(x.a.n)}</div><div class="sub">${esc(x.a.a || '')}${i === 0 && !q ? ' · al centro della griglia' : ''}</div></a>`).join('') || '<div class="vuoto">Nessuna attività.</div>'; };
+  $('#anQ').oninput = lista; lista();
+}
+async function apriAnalisi(zid, pid) {
+  const s = ST.zone[zid]; if (!s || !s.z.attivita || !s.z.attivita[pid]) { location.hash = '#zone'; return; }
+  const z = s.z, a = z.attivita[pid], pr = Object.values(z.prospect || {}).find((p) => !p.del && p.pid === pid);
+  const k = L.chiaveAnalisi(pid), dir = `zone/${zid}/analisi`;
+  const st = { filtro: 'tutte', testi: {}, sha: null, base: {}, img: null };
+  const firma = ST.conf.firma && ST.conf.firma.nome ? ST.conf.firma : null;
+  const data = L.datiAnalisi(z, pid, { nome: pr && pr.nome, firma });
+  const gruppi = [['tutte', 'Tutte'], ['spiegazione', 'Spiegazione'], ...(data.ai ? [['ai', '✦ AI Mode']] : []), ['maps', 'Maps'], ['chiusura', 'Chiusura']];
+  const f = apriFoglio(`Analisi · ${pr ? pr.nome : a.n}`, `
+    <div class="sub">${esc(z.meta.quartiere)} · «${esc(z.meta.keyword)}» · rilevazione del ${esc(z.meta.data_testo || '')}${data.ai ? '' : ' · senza AI Mode'}</div>
+    <div class="filtri mt" id="anF">${gruppi.map(([g, l]) => `<button class="chip ${g === 'tutte' ? 'on' : ''}" data-ag="${g}">${l}</button>`).join('')}</div>
+    <iframe id="anFrame" class="an-frame" src="motore/analisi.html?v=${VERSIONE}" title="Deck dell'analisi"></iframe>
+    <div id="anTesti" class="an-testi" hidden></div>
+    <div class="an-barra"><button class="btn" id="anT">Testi</button><button class="btn pri" id="anPdf">Genera PDF</button></div>
+    <div id="anEsito" class="sub mt"></div>`, () => { if (ST.indietro) location.hash = ST.indietro; else history.back(); });
+  const fr = $('#anFrame', f);
+  const disegna = () => { const w = fr.contentWindow; if (!w || !w.disegna) return;
+    const r = w.disegna({ data: { ...data, mapImg: st.img }, testi: st.testi, filtro: st.filtro }); st.base = r.base || {};
+    fr.style.height = Math.max(200, w.document.body.scrollHeight + 4) + 'px'; };
+  fr.addEventListener('load', disegna);
+  addEventListener('resize', () => { if (document.body.contains(fr)) disegna(); });
+  f.querySelectorAll('[data-ag]').forEach((b) => (b.onclick = () => { st.filtro = b.dataset.ag; f.querySelectorAll('[data-ag]').forEach((x) => x.classList.toggle('on', x === b)); disegna(); }));
+  /* testi corretti a mano: un campo per testo, vuoto = testo automatico */
+  let tSalva = null, tDis = null;
+  const salvaTesti = async () => { if (!GH.ok()) return;
+    try { st.sha = await GH.putJSON(`${dir}/${k}-testi.json`, { pid, testi: st.testi, u: ora() }, st.sha, `Testi analisi ${a.n}`); const o = $('#anTs'); if (o) o.textContent = '✓ Salvato alle ' + oraAdesso(); }
+    catch (e) { toast(e.message); } };
+  $('#anT', f).onclick = () => { const p = $('#anTesti'); p.hidden = !p.hidden; if (p.hidden) return;
+    p.innerHTML = `<div class="riga"><b>Testi dell'analisi</b><span class="sub" id="anTs">Campo vuoto = testo automatico</span></div>` + Object.keys(st.base).filter((c) => ETIC_TESTI[c]).map((c) => `<label class="f">${esc(ETIC_TESTI[c])}<textarea data-at="${c}" rows="2" placeholder="${esc(st.base[c])}">${esc(st.testi[c] || '')}</textarea></label>`).join('');
+    p.querySelectorAll('[data-at]').forEach((el) => (el.oninput = () => { const v = el.value; if (v.trim()) st.testi[el.dataset.at] = v; else delete st.testi[el.dataset.at];
+      clearTimeout(tDis); tDis = setTimeout(disegna, 350); clearTimeout(tSalva); tSalva = setTimeout(salvaTesti, 1500); }));
+    p.scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+  /* PDF: richiesta nel repository dati, il motore la disegna con Chromium (Action «Genera analisi») */
+  const esito = $('#anEsito', f);
+  const mostraEsito = (e) => { if (!e) return; if (e.errore) { esito.innerHTML = `<span class="c-neg">${esc(e.errore)}</span>`; return; }
+    esito.innerHTML = `<button class="btn mini ink" data-pdf="${zid}|${esc(e.file)}">Apri ${esc(e.file.split('/').pop())}</button>${(e.avvisi || []).map((x) => `<div class="avviso">${esc(x)}</div>`).join('')}`; };
+  $('#anPdf', f).onclick = async () => {
+    if (!GH.ok()) { toast('Serve il collegamento GitHub'); return; }
+    const b = $('#anPdf'); b.disabled = true;
+    const job = { tipo: 'analisi', richiesta: String(Date.now()), pid, file: L.fileAnalisi(z, pid, oggi()), data, testi: st.testi };
+    try {
+      esito.textContent = 'Invio…';
+      await GH.putJSON(`${dir}/${k}-richiesta.json`, job, await GH.sha(`${dir}/${k}-richiesta.json`), `Analisi ${a.n}`);
+      const t0 = ora();
+      while (ora() - t0 < 8 * 60000) {
+        await new Promise((ok) => setTimeout(ok, 6000));
+        if (!document.body.contains(esito)) return;
+        if (document.hidden) continue;
+        esito.textContent = `In generazione… (${Math.round((ora() - t0) / 1000)} s, di solito un paio di minuti)`;
+        const e = await GH.getJSON(`${dir}/${k}-esito.json`).catch(() => null);
+        if (e && e.data.richiesta === job.richiesta) { mostraEsito(e.data); return; }
+      }
+      esito.textContent = 'Ancora in coda: riapri l\'analisi tra poco.';
+    } catch (e) { esito.innerHTML = `<span class="c-neg">${esc(e.message)}</span>`; } finally { b.disabled = false; }
+  };
+  /* dal repository: testi salvati, ultimo PDF e mappa reale della zona */
+  if (GH.ok()) {
+    // prima l'elenco della zona: niente richieste a file che non ci sono (404)
+    GH.list(`zone/${zid}`).then(async (zl) => { const zn = (zl || []).map((x) => x.name);
+      if (zn.includes('sfondo.png')) GH.getBlob(`zone/${zid}/sfondo.png`).then((bl) => { if (bl && document.body.contains(fr)) { st.img = URL.createObjectURL(bl); disegna(); } }).catch(() => {});
+      return zn.includes('analisi') ? GH.list(dir) : [];
+    }).then(async (el) => { const nomi = (el || []).map((x) => x.name);
+      if (nomi.includes(`${k}-testi.json`)) { const t = await GH.getJSON(`${dir}/${k}-testi.json`).catch(() => null); if (t) { st.testi = t.data.testi || {}; st.sha = t.sha; disegna(); } }
+      if (nomi.includes(`${k}-esito.json`)) { const e = await GH.getJSON(`${dir}/${k}-esito.json`).catch(() => null); if (e && !esito.innerHTML) mostraEsito(e.data); }
+    }).catch(() => {});
+  }
+}
 function apriProspect(zid, id, opz = {}) {
   const s = ST.zone[zid]; if (!s || !s.z.prospect[id]) { location.hash = '#prospect'; return; }
   const z = s.z, p = normStato(z.prospect[id]), a = z.attivita[p.pid] || {};
@@ -619,6 +705,8 @@ function apriProspect(zid, id, opz = {}) {
   <div class="riga mt"><input type="date" id="pGiroData" value="${esc(dataGiroProposta())}" style="width:auto"><button class="btn mini" id="pGiroAgg">Aggiungi al giro</button></div>`}
   ${an ? `<label class="f mt"><input type="checkbox" data-r="includi" ${p.report && p.report.includi === false ? '' : 'checked'} style="display:inline;width:auto;margin-right:6px">Includi nel PDF del giro</label>
   ` : ''}
+  ${an ? `<div class="box an-box"><div class="riga"><b>Analisi dedicata</b><span class="sub">${L.haAI(z) ? 'prima AI Mode, poi Maps' : 'solo Google Maps'}</span></div>
+    <div class="row mt"><a class="btn ink" href="#an/${zid}/${encodeURIComponent(p.pid)}">Apri l'analisi</a></div></div>` : ''}
   <div class="eb">Dati</div>
   ${inp('nome', 'Nome')}${inp('referente', 'Referente')}
   <label class="f">Partita IVA<input data-c="piva" inputmode="numeric" autocomplete="off" maxlength="24" value="${esc(p.piva || '')}"></label>
@@ -1101,7 +1189,7 @@ function apriZona(zid) {
   const f = apriFoglio(`${z.meta.quartiere} · ${z.meta.keyword}`, `
   <div class="sub">Rilevazione del ${esc(z.meta.data_testo)} · griglia ${esc(z.meta.lato)} · ${(z.punti || []).length} punti · ${L.haAI(z) ? 'AI Mode importato' : 'AI Mode assente'}</div>
   <div class="sub mt">${s.siti && s.siti.aggiornato ? `Siti controllati il ${oraRoma(s.siti.aggiornato, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}: ${Object.values(s.siti.siti).filter((v) => STATO_SITO[v.stato]).length} non funzionanti su ${Object.keys(s.siti.siti).length}` : 'Siti non ancora controllati'}</div>
-  <div class="row mt"><button class="btn mini" id="zSiti">Ricontrolla siti</button><button class="btn mini" id="zPdf">Ultimo PDF</button><button class="btn mini" id="zTesti">Testi della zona</button><button class="btn mini" id="zEsporta">Esporta CSV</button><button class="btn mini" id="zAI">${L.haAI(z) ? 'Aggiorna AI Mode' : 'Aggiungi AI Mode'}</button></div>
+  <div class="row mt"><button class="btn mini" id="zSiti">Ricontrolla siti</button><button class="btn mini" id="zPdf">Ultimo PDF</button><button class="btn mini" id="zTesti">Testi della zona</button><button class="btn mini" id="zEsporta">Esporta CSV</button><button class="btn mini" id="zAI">${L.haAI(z) ? 'Aggiorna AI Mode' : 'Aggiungi AI Mode'}</button><button class="btn mini ink" id="zAnalisi">Analisi dedicata</button></div>
   <div class="eb">Attività trovate</div>
   <div class="filtri">${[['top3', L.haAI(z) ? 'Top 3 AI Mode' : 'Top 3'], ['rv', 'Recensioni'], ['nome', 'Nome']].map(([k, l]) => `<button class="chip ${ord === k ? 'on' : ''}" data-ord="${k}">${l}</button>`).join('')}
   <button class="chip ${ST.f.soloNuove ? 'on' : ''}" id="soloNuove">Solo non in lista</button></div>
@@ -1126,6 +1214,7 @@ function apriZona(zid) {
     if (b && e && e.data.file && !e.data.errore) { b.classList.add('pdf-ok'); b.title = 'PDF già generato: ' + e.data.file.split('/').pop(); }
   }).catch(() => { /* pulsante normale */ });
   $('#zTesti', f).onclick = () => testiZona(zid);
+  $('#zAnalisi', f).onclick = () => sceltaAnalisi(zid);
   $('#zSiti', f).onclick = async () => {
     if (!GH.ok()) { toast('Serve il collegamento GitHub'); return; }
     try { await GH.putJSON(`zone/${zid}/siti-richiesta.json`, { creata: new Date().toISOString() }, await GH.sha(`zone/${zid}/siti-richiesta.json`), `Controllo siti ${zid}`);

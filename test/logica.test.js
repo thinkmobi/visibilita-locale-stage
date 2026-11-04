@@ -211,3 +211,17 @@ test('distanziaPin: i pin sovrapposti si separano, gli altri restano', () => {
   const tre = L.distanziaPin([{ x: 50, y: 50 }, { x: 52, y: 50 }, { x: 50, y: 53 }]);
   for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) assert.ok(Math.hypot(tre[i].x - tre[j].x, tre[i].y - tre[j].y) >= 28);
 });
+
+test('analisi dedicata: dati del deck dalla zona (griglie, quote nelle prime 3, nome file)', () => {
+  const D = L.datiAnalisi(z, 'pA', { nome: 'Agenzia Alfa' });
+  assert.equal(D.business.name, 'Agenzia Alfa');
+  assert.equal(D.grid.points, z.punti.length);
+  assert.equal(D.maps.grid.flat().length, z.punti.length);
+  assert.ok(D.maps.comp.some((c) => c.me), 'il merchant è sempre in classifica');
+  assert.ok(D.maps.comp.every((c, i, a) => i === 0 || a[i - 1].v >= c.v), 'classifica ordinata per quota');
+  const t3 = D.maps.grid.flat().filter((r) => r && r <= 3).length;
+  assert.equal(Math.round(D.maps.comp.find((c) => c.me).v * z.punti.length / 100), t3);
+  assert.equal(D.ai, null, 'senza scansione AI Mode niente blocco AI');
+  assert.match(L.fileAnalisi(z, 'pA', '2026-11-04'), /^261104-.+-Analisi$/);
+  assert.equal(L.chiaveAnalisi('ChIJOf_qcGlqiEcRrNwj1S7UPvA'), 'RrNwj1S7UPvA');
+});

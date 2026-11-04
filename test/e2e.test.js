@@ -504,6 +504,24 @@ test('10c. stage: sotto /…-stage/ l’app è di stage e non scrive sui dati di
   } finally { await t2.chiudi(); }
 });
 
+test('10d. analisi dedicata: dalla scheda prospect si apre il deck, prima le slide di spiegazione e poi i dati', async () => {
+  const t = await apri({ vista: 'prospect' });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    await t.page.evaluate((id) => { location.hash = `#an/${id}/pA`; }, ID);
+    const fr = await (await t.page.waitForSelector('#anFrame')).contentFrame();
+    await fr.waitForFunction(() => document.querySelectorAll('.deck .slide').length > 5, null, { timeout: 8000 });
+    const caps = await fr.$$eval('.cap', (a) => a.map((x) => x.textContent));
+    assert.match(caps[0], /Copertina/); assert.match(caps[1], /Come abbiamo misurato/);
+    assert.ok(caps.some((c) => /Il dato forte · Google Maps/.test(c)));
+    // la mappa reale non compare nelle slide di spiegazione
+    assert.equal(await fr.$$eval('.deck section', (a) => a.slice(0, 3).filter((s) => s.querySelector('image')).length), 0);
+    await t.page.click('#anT');
+    assert.ok(await t.page.locator('[data-at="nome"]').count());
+    assert.deepEqual(t.errori, []);
+  } finally { await t.chiudi(); }
+});
+
 test('11. service worker: si registra e dopo il primo caricamento l’app si apre anche senza rete', async () => {
   const t = await apri();
   try {
