@@ -310,3 +310,73 @@ html[data-amb="stage"] .top{border-bottom:3px solid #F29529}
 .an-barra .pri{flex:1}
 
 .an-link{display:block;margin-bottom:12px;border-left:4px solid var(--ink)}
+
+/* ================= computer (da 900 px, con mouse o trackpad) =================
+   menu a sinistra con etichette e contatori; schede in un pannello a destra:
+   in Prospect e Zone il pannello sta accanto all'elenco (da 1200 px), altrove si apre sopra la vista */
+.tab-brand,.tab-piede,.tab-n,.velo,.destra-vuota,.solo-desk-b{display:none}
+body.desk{display:grid;grid-template-columns:212px minmax(0,1fr);grid-template-rows:var(--top-h) minmax(0,1fr)}
+body.desk .top{grid-column:2;grid-row:1;padding:0 28px}
+body.desk .top .logo{display:none}
+body.desk .brand{font-size:21px}
+body.desk .vista{grid-column:2;grid-row:2;padding:22px 28px 36px}
+body.desk .tab{grid-column:1;grid-row:1/3;flex-direction:column;gap:2px;border-top:0;border-right:1px solid var(--line);padding:0 10px 14px;overflow-y:auto}
+body.desk .tab-brand{display:flex;align-items:center;gap:10px;height:var(--top-h);margin:0 -10px 10px;padding:0 18px;border-bottom:1px solid var(--line);font:700 17px PlexCond,system-ui,sans-serif;white-space:nowrap}
+body.desk .tab-brand .logo{width:24px;height:24px}
+body.desk .tab a{flex:none;flex-direction:row;align-items:center;gap:12px;padding:9px 12px;border-radius:8px;font-size:14px;color:#3C4743}
+body.desk .tab a:hover{background:var(--bg)}
+body.desk .tab a.on{background:var(--top-t);color:#1A7536}
+body.desk .tab svg{width:19px;height:19px}
+body.desk .tab-n{display:inline-block;margin-left:auto;padding:0 7px;border-radius:10px;background:#ECEEEB;color:var(--mute);font:500 11px/18px PlexMono,monospace}
+body.desk .tab-n:empty{display:none}
+body.desk .tab-n-neg{background:var(--neg-t);color:#A51C1A}
+body.desk .tab-piede{display:block;margin-top:auto;padding:10px 12px 0;font-size:11.5px;color:var(--mute)}
+body.desk .solo-desk-b{display:block}
+body.desk .toast{bottom:28px;left:calc(50% + 106px)}
+/* liste: righe un po' più dense, hover */
+body.desk a.card:hover{border-color:#B9C0BB;box-shadow:0 1px 4px rgba(24,35,42,.06)}
+body.desk .cerca{max-width:520px}
+/* Profilo e viste di testo restano leggibili */
+body.desk[data-base=altro] .vista>*{max-width:760px}
+
+/* pannello a destra: le schede (prospect, zona, moduli) */
+body.desk .foglio{left:auto;right:0;width:560px;max-width:calc(100vw - 212px);border-left:1px solid var(--line);box-shadow:-12px 0 32px rgba(24,35,42,.14)}
+body.desk .foglio .corpo{max-width:none;padding:14px 20px}
+body.desk .foglio .barra-salva{margin-left:-20px;margin-right:-20px;padding-left:20px;padding-right:20px}
+body.desk.fa .velo{display:block;position:fixed;inset:0 0 0 212px;z-index:9;background:rgba(24,35,42,.22)}
+/* analisi dedicata: il deck ha bisogno di tutta la larghezza */
+body.desk[data-v=an] .foglio{width:auto;left:212px;max-width:none;box-shadow:none}
+@media (min-width:1200px){
+  body.desk[data-base=prospect] .vista,body.desk[data-base=zone] .vista{padding-right:calc(560px + 28px)}
+  body.desk[data-base=prospect].fa .velo,body.desk[data-base=zone].fa .velo{display:none}
+  body.desk[data-base=prospect] .foglio,body.desk[data-base=zone] .foglio{box-shadow:none}
+  body.desk[data-base=prospect]:not(.fa) .destra-vuota,body.desk[data-base=zone]:not(.fa) .destra-vuota{display:grid;place-items:center;position:fixed;top:var(--top-h);right:0;bottom:0;width:560px;border-left:1px solid var(--line);background:#FAFBFA;color:var(--mute);font-size:14px;padding:40px;text-align:center}
+  .destra-vuota span{display:none}
+  body[data-base=prospect] .destra-vuota .dv-p,body[data-base=zone] .destra-vuota .dv-z{display:block}
+  body.desk[data-v=an] .velo{display:none}
+}
+
+/* Oggi: numeri e azioni a sinistra, giro di oggi a destra */
+body.desk .o-desk{display:grid;grid-template-columns:minmax(0,1fr) 420px;grid-template-areas:"kpi giro" "rich giro" "fatti giro";gap:0 28px;align-items:start}
+body.desk .o-kpi{grid-area:kpi}body.desk .o-giro{grid-area:giro}body.desk .o-rich{grid-area:rich}body.desk .o-fatti{grid-area:fatti}
+body.desk .o-giro>.eb:first-child{margin-top:0}
+body.desk .kpi{grid-template-columns:repeat(4,minmax(0,1fr))}
+
+/* Giro: mappa grande a sinistra, tappe a destra */
+body.desk .g-desk{display:grid;grid-template-columns:minmax(0,1fr) 440px;grid-template-areas:"ctrl ctrl" "mappa lista";gap:0 24px;align-items:start}
+body.desk .g-ctrl{grid-area:ctrl}body.desk .g-mappa{grid-area:mappa;position:sticky;top:0}body.desk .g-lista{grid-area:lista;min-width:0}
+body.desk .g-mappa .mappa-giro{height:calc(100dvh - var(--top-h) - 230px);min-height:420px}
+body.desk .g-lista>.eb:first-child{margin-top:12px}
+body.desk .barra-giro{max-width:620px}
+
+/* Numeri: otto numeri su due righe, imbuto e priorità affiancati */
+body.desk[data-base=cruscotto] .kpi{grid-template-columns:repeat(4,minmax(0,1fr))}
+body.desk .n-desk{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:0 28px;align-items:start}
+body.desk .n-desk>div{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:4px 18px 16px;margin-top:16px}
+.anello{width:150px;height:150px;margin:4px auto 8px}
+/* computer piccolo (900-1199 px): colonne di destra più strette */
+@media (max-width:1199px){
+  body.desk .o-desk{grid-template-columns:minmax(0,1fr) 340px}
+  body.desk .o-kpi .kpi{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.desk .g-desk{grid-template-columns:minmax(0,1fr) 380px}
+}

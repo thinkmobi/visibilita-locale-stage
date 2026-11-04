@@ -564,3 +564,41 @@ test('12. nessun errore JS né richiesta esterna imprevista durante un giro comp
     assert.deepEqual(t.esterne, []);
   } finally { await t.chiudi(); }
 });
+
+test('11. computer: menu a sinistra, scheda nel pannello accanto all’elenco, Esc chiude, telefono invariato', async () => {
+  const t = await apri({ desktop: true, vista: 'prospect' });
+  await t.page.setViewportSize({ width: 1440, height: 900 });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    await t.page.waitForSelector('#listaP a.card');
+    assert.ok(await t.page.evaluate(() => document.body.classList.contains('desk')), 'classe desk');
+    const nav = await t.page.locator('.tab').boundingBox();
+    assert.ok(nav.x === 0 && nav.height > 600 && nav.width < 260, 'menu verticale a sinistra');
+    assert.ok(await t.page.locator('.tab-brand').isVisible());
+    assert.match(await t.page.locator('#nProspect').innerText(), /^\d+$/);
+    await t.page.locator('#listaP a.card').first().click();
+    await t.page.waitForSelector('#foglio:not([hidden]) .barra-salva');
+    const fg = await t.page.locator('#foglio').boundingBox();
+    assert.equal(Math.round(fg.x + fg.width), 1440); assert.equal(Math.round(fg.width), 560);
+    assert.ok(await t.page.locator('#listaP a.card').first().isVisible(), 'elenco visibile accanto alla scheda');
+    assert.equal(await t.page.locator('#velo').isVisible(), false, 'niente velo in Prospect');
+    assert.equal(await t.page.locator('#titolo').innerText(), 'Prospect');
+    const n = await t.page.locator('#listaP a.card').count();
+    if (n > 1) { await t.page.locator('#listaP a.card').nth(1).click(); await t.page.waitForTimeout(400); }
+    await t.page.keyboard.press('Escape'); await t.page.waitForTimeout(400);
+    assert.equal(await t.page.evaluate(() => location.hash), '#prospect', 'Esc torna all’elenco anche dopo due schede');
+    assert.ok(await t.page.locator('#foglio').isHidden());
+    // altrove la scheda si apre sopra la vista, con il velo che la chiude
+    await t.page.evaluate(() => (location.hash = '#cruscotto')); await t.page.waitForTimeout(300);
+    assert.ok(await t.page.locator('.n-desk').isVisible());
+    assert.deepEqual(t.errori, []);
+  } finally { await t.chiudi(); }
+  const m = await apri({ vista: 'prospect' });
+  try {
+    await attendiStato(m.page, /Aggiornato/);
+    assert.equal(await m.page.evaluate(() => document.body.classList.contains('desk')), false);
+    const nav = await m.page.locator('.tab').boundingBox();
+    assert.ok(nav.y > 500 && nav.width === 390, 'telefono: barra in basso');
+    assert.equal(await m.page.locator('.tab-brand').isVisible(), false);
+  } finally { await m.chiudi(); }
+});

@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.36.0';
+const VERSIONE = '0.37.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -321,13 +321,29 @@ function avvisoAmbiente() {
     ? `App di stage collegata ai <b>dati di produzione</b> (${esc(r)}). Le prove finiscono sui dati veri: in Profilo imposta visibilita-dati-stage.`
     : `App di produzione collegata ai <b>dati di prova</b> (${esc(r)}). In Profilo imposta visibilita-dati.`}</div>`;
 }
+/* computer: da 900 px e con mouse o trackpad (stessa regola della Tabella). Menu a sinistra, schede in un pannello a destra */
+const DESK = window.matchMedia('(min-width:900px) and (hover:hover) and (pointer:fine)');
+const segnaDesk = () => document.body.classList.toggle('desk', DESK.matches);
+segnaDesk(); (DESK.addEventListener ? DESK.addEventListener('change', segnaDesk) : DESK.addListener(segnaDesk));
+{ const tp = document.getElementById('tabPiede'); if (tp) tp.textContent = 'Versione ' + VERSIONE; }
+/* contatori nel menu laterale: azioni scadute e prospect aperti */
+function contaMenu() {
+  if (!document.body.classList.contains('desk')) return;
+  const ap = tutti().filter((x) => inLavoro(x) && aperto(x.p));
+  const n = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v || ''; };
+  n('nOggi', ap.filter((x) => urgenza(x.p) < 0).length); n('nProspect', ap.length);
+}
 function render() {
   const [vista, a, b] = (location.hash.slice(1) || 'oggi').split('/');
   // indirizzo sconosciuto (vecchio segnalibro, errore di battitura): si torna a Oggi invece di lasciare la vista precedente
   if (!VISTE[vista] && vista !== 'p' && vista !== 'z' && vista !== 'an') { location.replace('#oggi'); return; }
-  document.querySelectorAll('.tab a').forEach((x) => x.classList.toggle('on', x.dataset.t === vista));
+  // sotto la scheda aperta (#p, #z) resta la vista di prima: nel menu resta accesa quella
+  const base = VISTE[vista] ? vista : ST.vistaAttuale || '';
+  document.querySelectorAll('.tab a').forEach((x) => x.classList.toggle('on', x.dataset.t === base));
+  document.body.dataset.v = vista; document.body.dataset.base = base;
+  contaMenu();
   document.body.classList.toggle('largo', vista === 'tabella');
-  $('#titolo').textContent = TITOLI[vista] || 'Visibilità';
+  $('#titolo').textContent = TITOLI[vista] || TITOLI[base] || 'Visibilità';
   if (VISTE[vista]) {
     const V0 = $('#vista'), scroll = V0.scrollTop, cambio = ST.vistaAttuale !== vista;
     V0.innerHTML = avvisoAmbiente() + VISTE[vista](); legaVista(vista);
@@ -342,6 +358,19 @@ function render() {
 document.addEventListener('focusout', () => setTimeout(() => { if (ST.daRender && $('#foglio').hidden && !(document.activeElement && $('#vista').contains(document.activeElement) && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))) { ST.daRender = false; ST.restaScroll = true; render(); } }, 50));
 // iOS: con html/body bloccati, la tastiera a volte lascia la pagina spostata in alto
 document.addEventListener('focusout', () => setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) { if (window.scrollY) window.scrollTo(0, 0); } }, 50));
+/* computer: clic fuori dal pannello o Esc chiudono la scheda; dall'elenco accanto al pannello si passa
+   da una scheda all'altra senza accumulare la cronologia (così «←» torna sempre all'elenco) */
+document.addEventListener('click', (e) => {
+  if (!document.body.classList.contains('desk')) return;
+  if (e.target.id === 'velo') { const c = $('#chiudi'); if (c) c.click(); return; }
+  const a = e.target.closest && e.target.closest('#vista a[href^="#p/"], #vista a[href^="#z/"]');
+  if (a && !$('#foglio').hidden && /^#(p|z)\//.test(location.hash) && !e.metaKey && !e.ctrlKey) { e.preventDefault(); location.replace(a.getAttribute('href')); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !document.body.classList.contains('desk') || $('#foglio').hidden) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '')) { document.activeElement.blur(); return; }
+  const c = $('#chiudi'); if (c) c.click();
+});
 window.addEventListener('hashchange', (e) => { const da = (e.oldURL.split('#')[1] || 'oggi'); if (VISTE[da.split('/')[0]]) ST.indietro = '#' + da; if (!/^#(p|z)\//.test(location.hash)) chiudiFoglio(); render(); });
 
 /* ---------- vista: oggi ---------- */
@@ -481,14 +510,16 @@ function vOggi() {
   const tappa = (x) => `<div class="riga" style="margin-top:4px"><span class="sub">${esc(x.p.giro.orario || '')}${x.p.giro.orario ? ' · ' : ''}tappa ${numTappa[x.zid + '|' + x.p.id] || ''}</span>${ripassare(x.z, x.p) ? '<span class="stato-tappa ripassare">↻ Ripassare</span>' : '<span class="stato-tappa">Visitare</span>'}</div>`;
   const esitoOggi = (x) => { const r = ultimoOggi(x); return `<div class="riga" style="margin-top:4px">${x.p.giro && x.p.giro.data === d && x.p.giro.fatto ? '<span class="stato-tappa consegnata">✓ Consegnato</span>' : ''}${r ? `<span class="sub">Oggi: ${esc(r.esito)}</span>` : ''}</div>`; };
   const vuoto = !giroDaFare.length && !richiami.length;
-  return `${kpi}
-  <div class="eb">Da fare oggi · ${ggLungo(d)} · ${giroDaFare.length + richiami.length} da contattare${fatti.length ? ` · ${fatti.length} già sentiti` : ''}</div>
+  return `<div class="o-desk"><div class="o-kpi">${kpi}</div>
+  <div class="o-giro"><div class="eb">Da fare oggi · ${ggLungo(d)} · ${giroDaFare.length + richiami.length} da contattare${fatti.length ? ` · ${fatti.length} già sentiti` : ''}</div>
   ${giro.length ? `<div class="row" style="margin-bottom:8px"><a class="btn mini" href="#giro">Apri il giro (${((n) => n + (n === 1 ? ' tappa' : ' tappe'))(giro.filter(inLavoro).length)})</a></div>` : ''}
   ${giroDaFare.length ? `<div class="sub" style="margin:2px 0 6px">Giro di oggi</div><div class="lista">${giroDaFare.map((x) => cardProspect(x, tappa(x))).join('')}</div>` : ''}
-  ${richiami.length ? `<div class="sub" style="margin:10px 0 6px">Azioni in scadenza oggi</div><div class="lista">${richiami.map((x) => cardProspect(x)).join('')}</div>` : ''}
-  ${vuoto ? `<div class="vuoto">${giro.length || fatti.length ? 'Tutti sentiti per oggi.' : 'Niente in programma per oggi.'}</div>` : ''}
-  ${fatti.length ? `<div class="row mt"><button class="btn mini" id="oFatti">${ST.f.fatti ? 'Nascondi' : 'Mostra'} ${fatti.length === 1 ? 'chi è già stato sentito' : `i ${fatti.length} già sentiti`} oggi</button></div>
-  ${ST.f.fatti ? `<div class="lista mt">${fatti.map((x) => cardProspect(x, esitoOggi(x))).join('')}</div>` : ''}` : ''}`;
+  ${(() => { const pr = Object.values(ST.zone).flatMap((s) => Object.values(s.z.prospect || {})).filter((p) => !p.del && p.giro && p.giro.data > d && !p.giro.fatto).map((p) => p.giro.data).sort()[0];
+    return pr ? `<div class="sub solo-desk-b" style="margin:12px 0 0">Prossimo giro: <a href="#giro" data-gd-oggi="${esc(pr)}">${esc(ggLungo(pr))}</a></div>` : ''; })()}</div>
+  <div class="o-rich">${richiami.length ? `<div class="sub" style="margin:10px 0 6px">Azioni in scadenza oggi</div><div class="lista">${richiami.map((x) => cardProspect(x)).join('')}</div>` : ''}
+  ${vuoto ? `<div class="vuoto">${giro.length || fatti.length ? 'Tutti sentiti per oggi.' : 'Niente in programma per oggi.'}</div>` : ''}</div>
+  <div class="o-fatti">${fatti.length ? `<div class="row mt"><button class="btn mini" id="oFatti">${ST.f.fatti ? 'Nascondi' : 'Mostra'} ${fatti.length === 1 ? 'chi è già stato sentito' : `i ${fatti.length} già sentiti`} oggi</button></div>
+  ${ST.f.fatti ? `<div class="lista mt">${fatti.map((x) => cardProspect(x, esitoOggi(x))).join('')}</div>` : ''}` : ''}</div></div>`;
 }
 function benvenuto() {
   if (DB.guasto && !GH.ok()) return `<div class="box"><h2>Archivio del telefono non raggiungibile</h2>
@@ -548,12 +579,12 @@ function statoBarra(f, stato, testo) {
 function apriFoglio(titolo, html, onClose) {
   const f = $('#foglio');
   f.innerHTML = `<div class="testa"><button id="chiudi" aria-label="Chiudi">←</button><h2>${esc(titolo)}</h2><span id="fSync" class="sync ${ST.sync.stato}" role="status"><span class="dot"></span><span>${esc(ST.sync.msg)}</span></span></div><div class="corpo">${html}</div>`;
-  f.hidden = false; document.body.style.overflow = 'hidden';
+  f.hidden = false; document.body.style.overflow = 'hidden'; document.body.classList.add('fa');
   $('#chiudi').onclick = () => { if (onClose) onClose(); else history.back(); };
   return f;
 }
 function chiudiFoglio() {
-  const f = $('#foglio'); f.hidden = true; f.innerHTML = ''; document.body.style.overflow = '';
+  const f = $('#foglio'); f.hidden = true; f.innerHTML = ''; document.body.style.overflow = ''; document.body.classList.remove('fa');
   // aggiornamenti arrivati mentre il foglio era aperto: si mostrano adesso
   if (ST.daRender) { ST.daRender = false; ST.restaScroll = true; setTimeout(render, 0); }
 }
@@ -996,14 +1027,14 @@ function vGiro() {
   ST.mappaGiro = tappe.map((x) => { const a = x.z.attivita[x.p.pid] || {}; const n = numTappa[x.zid + '|' + x.p.id]; return a.la && a.lo ? { zid: x.zid, id: x.p.id, n, nome: x.p.nome, fatto: !!x.p.giro.fatto, rip: daRipassare(x), rc: reportCompleto(x.z, x.p), ni: nonInteressato(x.z, x.p), vis: contattata(x), la: a.la, lo: a.lo } : null; }).filter(Boolean);
   const senzaCoord = tappe.length - ST.mappaGiro.length;
   const percorso = (arr) => { const dest = arr[arr.length - 1]; const wp = arr.slice(0, -1).slice(0, 9); return `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${encodeURIComponent(dest)}${wp.length ? '&waypoints=' + encodeURIComponent(wp.join('|')) : ''}`; };
-  return `<div class="barra-giro"><input type="date" id="gData" class="cerca" value="${d}"><button class="btn" id="gAgg">+ Tappa</button>${tutte.length ? '<button class="btn" id="gSposta">Sposta…</button>' : ''}</div>
+ return `<div class="g-desk"><div class="g-ctrl"><div class="barra-giro"><input type="date" id="gData" class="cerca" value="${d}"><button class="btn" id="gAgg">+ Tappa</button>${tutte.length ? '<button class="btn" id="gSposta">Sposta…</button>' : ''}</div>
   <div class="filtri mt date-giro">${date.map((x) => `<button class="chip ${x === d ? 'on' : ''} ${x < og ? 'arretrato' : ''}" data-gd="${esc(x)}" ${x < og ? 'title="Giro passato con tappe ancora da fare"' : ''}>${esc(etichettaData(x))}</button>`).join('')}</div>
   ${filtriGiro}
   ${tappe.length ? `<div class="row mt"><a class="btn ink" href="${indirizzi.length ? percorso(indirizzi) : '#giro'}" target="_blank" rel="noopener">${ico('map')} Percorso a piedi (${indirizzi.length} da visitare)</a></div>
-  ${indirizzi.length > 10 ? '<div class="avviso">Google Maps accetta al massimo 10 tappe per percorso: le altre si aprono dalla singola tappa.</div>' : ''}` : ''}
-  ${ST.mappaGiro.length ? `<div class="mappa-giro mt" id="mappaGiro" role="img" aria-label="Mappa delle tappe del giro"></div>
-  <div class="sub mappa-legenda"><span class="mg-pin">1</span> visitare <span class="mg-pin vis">2</span> visitato <span class="mg-pin rip">3</span> ripassare <span class="mg-pin rc">4</span> report completo <span class="mg-pin ni">✕</span> non interessato <span class="mg-pin fatto">✓</span> consegnato${senzaCoord ? ` · ${senzaCoord} tappe senza posizione` : ''}</div>` : ''}
-  ${Object.entries(perZona).map(([zid, arr]) => { const tutteZ = tutte.filter((x) => x.zid === zid); return `
+ ${indirizzi.length > 10 ? '<div class="avviso">Google Maps accetta al massimo 10 tappe per percorso: le altre si aprono dalla singola tappa.</div>' : ''}` : ''}</div>
+  <div class="g-mappa">${ST.mappaGiro.length ? `<div class="mappa-giro mt" id="mappaGiro" role="img" aria-label="Mappa delle tappe del giro"></div>
+  <div class="sub mappa-legenda"><span class="mg-pin">1</span> visitare <span class="mg-pin vis">2</span> visitato <span class="mg-pin rip">3</span> ripassare <span class="mg-pin rc">4</span> report completo <span class="mg-pin ni">✕</span> non interessato <span class="mg-pin fatto">✓</span> consegnato${senzaCoord ? ` · ${senzaCoord} tappe senza posizione` : ''}</div>` : ''}</div>
+  <div class="g-lista">${Object.entries(perZona).map(([zid, arr]) => { const tutteZ = tutte.filter((x) => x.zid === zid); return `
     <div class="eb">${esc(ST.zone[zid].z.meta.quartiere)} · ${tutteZ.length} tappe pianificate · ${tutteZ.filter((x) => x.p.giro.fatto).length} consegnate</div>
     <div class="lista">${arr.map((x) => {
       const ind = x.p.indirizzo || (x.z.attivita[x.p.pid] || {}).a || '';
@@ -1029,7 +1060,7 @@ function vGiro() {
       return `<div class="box"><div class="riga"><b>Stampa del giro</b><span class="sub">${stampa.length} fogli A4${ai ? '' : ' · solo Google Maps'}</span></div>
       ${fuori.length ? `<div class="avviso">Senza pagina nel PDF perché non compaiono nella scansione: ${fuori.map((x) => esc(x.p.nome)).join(', ')}.</div>` : ''}
       <div class="row mt"><button class="btn pri" data-stampa="${zid}" ${ST.pdf[zid] ? 'disabled' : ''}>Genera PDF</button><span id="st-${zid}" class="sub">${ST.pdfMsg[zid] || ''}</span></div></div>`;
-    })()}`; }).join('') || `<div class="vuoto">Nessuna tappa ${d === og ? 'oggi' : 'in questa data'}. Aggiungila con “+ Tappa”.${d === og && prossima ? `<div class="mt"><button class="btn" data-gd="${esc(prossima)}">Prossimo giro: ${esc(prossima === dm ? 'domani' : ggLungo(prossima))}</button></div>` : ''}</div>`}`;
+    })()}`; }).join('') || `<div class="vuoto">Nessuna tappa ${d === og ? 'oggi' : 'in questa data'}. Aggiungila con “+ Tappa”.${d === og && prossima ? `<div class="mt"><button class="btn" data-gd="${esc(prossima)}">Prossimo giro: ${esc(prossima === dm ? 'domani' : ggLungo(prossima))}</button></div>` : ''}</div>`}</div></div>`;
 }
 /* sposta in blocco le tappe di un giro a un'altra data: tutte o solo quelle scelte */
 function formSpostaGiro() {
@@ -1396,12 +1427,21 @@ function vCruscotto() {
     <button><b>${vinti.length + persi.length ? L.pct(vinti.length, vinti.length + persi.length) + '%' : '—'}</b><span>Tasso di chiusura</span></button>
     <button><b>${eur(vinti.reduce((s, x) => s + (+x.p.valore || 0), 0))}</b><span>Valore firmato</span></button>
     <button><b>${eur(tt.filter((x) => aperto(x.p)).reduce((s, x) => s + (+x.p.valore || 0), 0))}</b><span>Valore in proposta</span></button></div>
-  <div class="eb">Imbuto per stato</div>
+  <div class="n-desk"><div class="n-imb"><div class="eb">Imbuto per stato</div>
   <table class="funnel" style="width:100%">${STATI.map((s) => { const n = tt.filter((x) => x.p.stato === s); return `<tr><td style="width:42%">${s}</td><td style="width:34%"><div class="barra"><i style="width:${n.length / max * 100}%"></i></div></td><td class="mono" style="text-align:right">${n.length}</td><td class="mono" style="text-align:right">${n.length ? eur(n.reduce((a, x) => a + (+x.p.valore || 0), 0)) : ''}</td></tr>`; }).join('')}</table>
-  <div class="eb">Aperti per priorità</div>
+</div><div class="n-pri">
+  <div class="eb">Aperti per priorità</div>${anelloPriorita(tt)}
   <table class="funnel" style="width:100%">${PRIORITA.map((pr) => `<tr><td>${prioHtml(pr)}</td><td class="mono" style="text-align:right">${tt.filter((x) => x.p.priorita === pr && aperto(x.p)).length}</td></tr>`).join('')}</table>
   <div class="eb">Esiti dei contatti</div>
-  <table class="funnel" style="width:100%">${ESITI.map((e) => [e, regs.filter((r) => esitiDi(r).includes(e)).length]).filter((x) => x[1]).map(([e, n]) => `<tr><td>${e}</td><td class="mono" style="text-align:right">${n}</td></tr>`).join('') || '<tr><td class="sub">Ancora nessun contatto registrato.</td></tr>'}</table>`;
+  <table class="funnel" style="width:100%">${ESITI.map((e) => [e, regs.filter((r) => esitiDi(r).includes(e)).length]).filter((x) => x[1]).map(([e, n]) => `<tr><td>${e}</td><td class="mono" style="text-align:right">${n}</td></tr>`).join('') || '<tr><td class="sub">Ancora nessun contatto registrato.</td></tr>'}</table></div></div>`;
+}
+/* computer: anello dei prospect aperti per priorità, con i colori delle priorità */
+function anelloPriorita(tt) {
+  const COL = { 1: 'var(--g1)', 2: 'var(--o)', 0: 'var(--home)', 3: '#9AA3A0' };
+  const ap = tt.filter((x) => aperto(x.p)), tot = ap.length; if (!tot) return '';
+  let o = 0; const archi = PRIORITA.map((pr) => { const v = ap.filter((x) => x.p.priorita === pr).length / tot * 100; const k = String(pr)[0];
+    const el = v ? `<circle cx="21" cy="21" r="15.9" fill="none" stroke="${COL[k] || '#9AA3A0'}" stroke-width="6" stroke-dasharray="${v.toFixed(2)} ${(100 - v).toFixed(2)}" stroke-dashoffset="${(25 - o).toFixed(2)}"/>` : ''; o += v; return el; }).join('');
+  return `<svg class="anello solo-desk-b" viewBox="0 0 42 42" role="img" aria-label="${tot} prospect aperti per priorità">${archi}<text x="21" y="23.6" text-anchor="middle" font-size="7.5" font-weight="700" fill="var(--ink)">${tot}</text></svg>`;
 }
 
 /* ---------- vista: tabella (computer) ---------- */
@@ -1557,6 +1597,7 @@ function legaVista(v) {
       if (el.tagName === 'INPUT') el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } if (e.key === 'Escape') { const [zid, id, k] = el.dataset.te.split('|'); el.value = ST.zone[zid].z.prospect[id][k] ?? ''; el.blur(); } });
     });
   }
+  if (v === 'oggi') V.querySelectorAll('[data-gd-oggi]').forEach((a) => (a.onclick = () => { ST.giroData = a.dataset.gdOggi; }));
   if (v === 'oggi' && $('#oFatti')) $('#oFatti').onclick = () => { ST.f.fatti = !ST.f.fatti; render(); };
   if (v === 'prospect') {
     V.querySelectorAll('[data-f]').forEach((b) => (b.onclick = () => { ST.f[b.dataset.f] = b.dataset.v; if (b.dataset.f === 'stato') ST.f.ni = false; render(); }));
