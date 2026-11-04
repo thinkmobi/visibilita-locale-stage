@@ -309,4 +309,4 @@ html[data-amb="stage"] .top{border-bottom:3px solid #F29529}
 .an-barra{position:sticky;bottom:0;display:flex;gap:8px;padding:10px 0;background:var(--bg);border-top:1px solid var(--line);margin-top:10px}
 .an-barra .pri{flex:1}
 
-.an-link{border-left:4px solid var(--ink)}
+.an-link{display:block;margin-bottom:12px;border-left:4px solid var(--ink)}
