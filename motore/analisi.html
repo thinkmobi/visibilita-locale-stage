@@ -170,6 +170,9 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
   const top3 = (g) => g.flat().filter((r) => r && r <= 3).length;
   const ord = (n, g = 'f') => it(n) + (g === 'm' ? 'º' : 'ª');   // ª con posizione, º con posto
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  /* colori dello schema per le quote tra le prime 3 posizioni (come L.colorePct): verde dal 66%, arancione dal 33%, rosso sotto */
+  const tinta = (v) => (v >= 66 ? 'var(--r1)' : v >= 33 ? 'var(--r5)' : 'var(--r7)');
+  const tintaPct = (h) => String(h).replace(/(\d+(?:,\d+)?)\s?%/g, (m, n) => `<span style="color:${tinta(parseFloat(n.replace(',', '.')))}">${m}</span>`);
   const elenco = (a) => a.length < 2 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' e ' + a[a.length - 1];
   const zone = (n) => n === 1 ? '1 zona' : n + ' zone';
   const ICO = {
@@ -313,7 +316,7 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
     let CUR = null, SHOWN = [];
     const footHTML = (n) => `<div class="foot"><span>${H('nome')} · analisi del ${esc(D.scanDate)}</span><span>${String(n).padStart(2, '0')} / ${SHOWN.length}</span></div>`;
     const frame = (n, eyebrow, title, body) => `<div class="slide"><div class="sl${CUR && CUR.legend ? ' withleg' : ''}">
-      <div><div class="eyebrow"><i></i>${eyebrow}</div>${title ? `<h2 class="title">${title}</h2>` : ''}</div>
+      <div><div class="eyebrow"><i></i>${eyebrow}</div>${title ? `<h2 class="title">${tintaPct(title)}</h2>` : ''}</div>
       ${body}
       ${CUR && CUR.legend ? `<div class="legrow">${legend()}</div>` : ''}
       ${footHTML(n)}</div></div>`;
@@ -323,7 +326,7 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
       `<div class="body" style="grid-template-columns:minmax(0,1fr) auto">
         <div style="display:grid;gap:1.4cqw;align-content:center">
           <div style="display:flex;gap:4cqw;align-items:flex-end;flex-wrap:wrap">
-            <div style="display:grid;gap:1cqw"><div class="lab">punti nelle prime 3 posizioni</div><div class="big" style="color:${up(f.t3 / f.pts * 100) <= 10 ? 'var(--r7)' : 'var(--accent)'}">${it(f.t3 / f.pts * 100)}<span class="unit">%</span></div></div>
+            <div style="display:grid;gap:1cqw"><div class="lab">punti nelle prime 3 posizioni</div><div class="big" style="color:${tinta(up(f.t3 / f.pts * 100))}">${it(f.t3 / f.pts * 100)}<span class="unit">%</span></div></div>
             ${f.arp ? `<div style="display:grid;gap:1cqw"><div class="lab">${f.found < f.pts ? 'posizione media dove comparite' : 'posizione media'}</div><div class="big" style="color:var(--ink)">${ord(f.arp)}</div></div>` : ''}
           </div>
           <div class="txt">${H('heroTxt' + sfx(f))}</div>
@@ -335,7 +338,7 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
         <div class="mapbox" style="justify-self:start;width:29cqw;height:29cqw">${gridSVG(f.grid, { dim: true, bgmap: D.mapImg, hl: inW(f.W), aria: 'Zona più debole' })}</div>
         <div style="display:grid;gap:2cqw;align-content:center">
           <span class="lab">zona più debole: ${f.W.name} · punti nelle prime 3 posizioni</span>
-          <div class="big" style="font-size:6.4cqw;color:var(--r7)">${pc(f.W.t3, f.W.cnt)}</div>
+          <div class="big" style="font-size:6.4cqw;color:${tinta(up(f.W.t3 / f.W.cnt * 100))}">${pc(f.W.t3, f.W.cnt)}</div>
           <div class="kv"><div><span class="lab">zone in cui comparite</span><b>${f.wFound.length} su ${f.W.cnt}</b></div><div><span class="lab">posizione migliore in zona</span><b>${f.wFound.length ? ord(Math.min(...f.wFound)) : 'assenti'}</b></div></div>
           <div class="txt neg">${H('weakTxt' + sfx(f))}</div>
         </div>
