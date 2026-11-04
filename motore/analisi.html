@@ -87,8 +87,9 @@ body{padding:12px;font-family:'Roboto',system-ui,sans-serif}
 /* copertina e chiusura */
 .cover .sl{grid-template-rows:auto 1fr auto auto}
 .cover.first .sl{grid-template-rows:auto 1fr auto}
-.cover-bg{position:absolute;right:-3cqw;top:1.5cqw;width:47cqw;height:47cqw}
-.cover.first .cover-bg{right:-6cqw;top:calc(50% - 26cqw);width:52cqw;height:52cqw}
+/* copertina e chiusura: stesso motivo a pallini, stessa misura e posizione (il modello è la copertina) */
+.cover-bg{position:absolute;right:-6cqw;top:calc(50% - 26cqw);width:52cqw;height:52cqw}
+.cover .foot{max-width:46cqw}   /* la chiusura tiene il piede a sinistra, fuori dal motivo */
 .cover-name{font-family:var(--f-display);font-weight:700;letter-spacing:-.01em;font-size:6.57cqw;line-height:.95;margin:0;max-width:44cqw;text-wrap:balance;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden;padding-bottom:.14em;margin-bottom:-.14em}
 .contact{display:grid;gap:.8cqw;max-width:50cqw;position:relative;background:var(--panel);border-radius:.6cqw;padding:1.4cqw 1.8cqw;border-left:.4cqw solid var(--accent);justify-self:start}
 .contact .cname{font-family:var(--f-display);font-weight:700;font-size:var(--fs-sub);line-height:1.1;display:block}
