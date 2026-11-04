@@ -263,16 +263,21 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
     add('methodTitle', `Abbiamo cercato «${KW}» da ${N} punti intorno alla vostra sede`);
     add('methodTxt', `Il ${D.scanDate}, da ognuno dei ${N} punti di una griglia di ${String(G.radiusKm * 2).replace('.', ',')}×${String(G.radiusKm * 2).replace('.', ',')} km intorno alla vostra sede, abbiamo eseguito la stessa ricerca che farebbe un potenziale cliente${AI ? ' su Google AI Mode (le risposte generate dall’intelligenza artificiale di Google) e' : ''} su Google Maps, verificando con dati pubblici di Google, non pubblicitari, in che posizione comparite strada per strada.`);
     ORDER.forEach((k) => { const f = PF[k], sfx = k === 'maps' ? 'Maps' : '', gap = f.lead ? up(f.ME.v) - up(f.RU.length ? f.RU[0].v : 0) : up(f.L0.v) - up(f.ME.v);
-      add('heroTitle' + sfx, f.lead ? `Su ${f.lab} nessuno compare nelle prime 3 posizioni più spesso di voi`
-        : f.ME.pos === 2 ? `Su ${f.lab} un’attività compare nelle prime 3 posizioni più spesso di voi` : `Su ${f.lab} ${f.ME.pos - 1} attività compaiono nelle prime 3 posizioni più spesso di voi`);
-      add('heroTxt' + sfx, (f.lead ? (f.RU.length ? `${elenco(f.RU.map((c) => c.n))} ${f.RU.length > 1 ? 'vi seguono' : 'vi segue'} al ${it(f.RU[0].v)}%, a ${gap} punti.` : 'Nessun’altra attività compare nelle prime 3 posizioni.')
-        : `${f.L0.n} è nelle prime 3 posizioni nel ${it(f.L0.v)}% dei punti, voi nel ${it(f.ME.v)}%: ${gap} punti di distacco.`)
+      const miss = f.pts - f.t3, prime = k === 'ai' ? 'tra le prime risposte' : 'tra i primi risultati';
+      add('heroTitle' + sfx, f.t3 === 0 ? `Su ${f.lab} non comparite mai nelle prime 3 posizioni`
+        : f.t3 === f.pts ? `Su ${f.lab} siete nelle prime 3 posizioni in tutti i ${f.pts} punti` : `Su ${f.lab} siete nelle prime 3 posizioni in ${f.t3} punti su ${f.pts}`);
+      const dove = !f.found ? ': il vostro nome non compare.' : f.found === 1 ? `; nell’unico punto in cui comparite siete in ${ord(f.arp)} posizione.` : f.arp ? `; dove comparite, siete in media in ${ord(f.arp)} posizione.` : '.';
+      add('heroTxt' + sfx, (miss ? (miss === f.pts ? `In nessuno dei ${f.pts} punti chi cerca ${svc} vi trova ${prime}` : `In ${miss} punti su ${f.pts} chi cerca ${svc} non vi trova ${prime}`) + dove
+        : 'Ovunque nella griglia chi cerca vi trova subito.')
         + (k === 'ai' ? ' Sono le risposte che chi cerca legge per prime.' : ' Sono le posizioni che Google mostra subito, senza far scorrere la pagina.'));
       add('weakTitle' + sfx, f.W.t3 === f.W.cnt ? `Su ${f.short} siete tra i primi 3 anche nella zona più debole`
-        : f.W.t3 === 0 ? `A ${f.W.name}, su ${f.short}, chi cerca ${svc} trova prima le altre` : `A ${f.W.name}, su ${f.short}, siete tra i primi 3 solo in ${zone(f.W.t3)} su ${f.W.cnt}`);
-      const wn = f.wNames.slice(0, 3);
-      add('weakTxt' + sfx, wn.length ? `Qui i primi 3 posti vanno più spesso a ${elenco(wn.map(([n, c]) => `${n} (${zone(c)})`))}.` : `Qui ${f.short} non mostra nessuno nelle prime 3 posizioni.`);
-      add('compTitle' + sfx, f.lead ? (f.RU.length ? `Su ${f.short} ${f.RU[0].n} è a ${gap} punti da voi` : `Su ${f.short} siete gli unici nelle prime 3 posizioni`) : `Su ${f.short} ${f.L0.n} vi precede di ${gap} punti`);
+        : f.W.t3 === 0 ? `A ${f.W.name}, su ${f.short}, non comparite nelle prime 3 posizioni` : `A ${f.W.name}, su ${f.short}, siete tra i primi 3 solo in ${zone(f.W.t3)} su ${f.W.cnt}`);
+      const best = f.wFound.length ? Math.min(...f.wFound) : 0;
+      add('weakTxt' + sfx, !f.wFound.length ? `Da questa zona ${f.short} non vi mostra: chi cerca ${svc} qui non sa che esistete.`
+        : best > 3 ? `Da questa zona comparite al massimo in ${ord(best)} posizione: per trovarvi bisogna scorrere la pagina.`
+        : `Da questa zona comparite tra i primi 3 solo in ${zone(f.W.t3)} su ${f.W.cnt}: altrove vi si trova solo scorrendo.`);
+      add('compTitle' + sfx, f.lead ? `Su ${f.short} avete la quota più alta delle prime 3 posizioni: ${it(f.ME.v)}%`
+        : `Su ${f.short} avete il ${it(f.ME.v)}% delle prime 3 posizioni: in testa si arriva al ${it(f.L0.v)}%`);
     });
     if (AI && MP) {
       add('aiTitle', `Tra le prime 3 posizioni nel ${pc(AI.t3, AI.pts)} dei punti su Google AI Mode e nel ${pc(MP.t3, MP.pts)} su Maps`);
@@ -282,11 +287,11 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
     const cards = [];
     if (B.unclaimed) cards.push(['Scheda Google non rivendicata', 'Nessuno la gestisce: non potete rispondere alle recensioni né correggere orari e categoria.', 'Effetto: chiunque può proporre modifiche alla vostra scheda.', 1, true]);
     if (AI && (!sedeAI || sedeAI > 3)) { const av = AI.names[n0()][n0()].slice(0, 3);
-      cards.push([sedeAI ? `Dalla vostra sede, su AI Mode siete al ${ord(sedeAI, 'm')} posto` : 'Dalla vostra sede AI Mode non vi cita', av.length ? `L’intelligenza artificiale di Google cita prima ${elenco(av)}.` : 'L’intelligenza artificiale di Google cita prima altre attività.', `Effetto: vicino alla sede chi chiede ad AI Mode legge ${av.length > 1 ? av.length + ' nomi' : 'un nome'} prima del vostro.`, 0]); }
-    if (lost) cards.push([`${zone(lost)} perse passando ad AI Mode`, `In ${zone(lost)} Google Maps vi mette tra i primi 3, le risposte di AI Mode no.`, lostFirst ? `Effetto: in quelle zone il primo nome citato è più spesso ${lostFirst[0]} (${zone(lostFirst[1])}).` : 'Effetto: in quelle zone chi chiede ad AI Mode trova prima i concorrenti.', 0]);
+      cards.push([sedeAI ? `Dalla vostra sede, su AI Mode siete al ${ord(sedeAI, 'm')} posto` : 'Dalla vostra sede AI Mode non vi cita', sedeAI ? `Chi chiede ad AI Mode ${svc} a due passi da voi trova il vostro nome solo dopo le prime risposte.` : `Chi chiede ad AI Mode ${svc} a due passi da voi riceve una risposta senza il vostro nome.`, 'Effetto: perdete proprio i clienti del vostro quartiere.', 0]); }
+    if (lost) cards.push([`${zone(lost)} perse passando ad AI Mode`, `In ${zone(lost)} Google Maps vi mette tra i primi 3, le risposte di AI Mode no.`, 'Effetto: chi usa l’intelligenza artificiale di Google non vi trova dove Maps vi premia.', 0]);
     if (MP && B.rv != null) { const cr = MP.comp.filter((c) => !c.me && c.rv != null).sort((a, b) => b.rv - a.rv)[0];
-      if (cr && cr.rv > Math.max(10, B.rv * 1.5)) cards.push([`${B.rv} recensioni contro ${cr.rv}`, `${cr.n} ne ha ${cr.rv} e su Maps è tra i primi 3 nel ${it(cr.v)}% delle zone.`, 'Effetto: chi confronta le schede vede più giudizi sui concorrenti.', 2]); }
-    ORDER.forEach((k) => { const f = PF[k]; if (f.W.t3 < f.W.cnt) cards.push([`Zona ${f.W.name}: ${f.short} vi mette tra i primi 3 in ${zone(f.W.t3)} su ${f.W.cnt}`, f.wNames.length ? `Lì i primi posti vanno più spesso a ${elenco(f.wNames.slice(0, 2).map(([n]) => n))}.` : 'Lì compaiono altre attività.', 'Effetto: chi cerca da quella zona chiama prima un concorrente.', k === 'ai' ? 0 : 2]); });
+      if (cr && cr.rv > Math.max(10, B.rv * 1.5)) cards.push([`${B.rv} recensioni sulla vostra scheda`, `Tra le schede che Maps mette nelle prime 3 posizioni si arriva a ${cr.rv}: con ${B.rv} la vostra pesa meno.`, 'Effetto: chi confronta le schede sceglie quella con più giudizi.', 2]); }
+    ORDER.forEach((k) => { const f = PF[k]; if (f.W.t3 < f.W.cnt) cards.push([`Zona ${f.W.name}: ${f.short} vi mette tra i primi 3 in ${zone(f.W.t3)} su ${f.W.cnt}`, f.wFound.length ? `Da lì chi cerca ${svc} vi trova solo scorrendo la pagina.` : `Da lì chi cerca ${svc} non vi trova.`, 'Effetto: i clienti di quella zona scelgono senza vedervi.', k === 'ai' ? 0 : 2]); });
     cards.slice(0, 3).forEach((c, i) => { add(`card${i + 1}t`, c[0]); add(`card${i + 1}c`, c[1]); add(`card${i + 1}e`, c[2]); });
     const cardMeta = cards.slice(0, 3).map((c) => ({ ico: c[3], alert: !!c[4] }));
     add('cardsTitle', cardMeta.length === 3 ? 'Tre punti deboli da sistemare' : cardMeta.length === 2 ? 'Due punti deboli da sistemare' : 'Il punto debole da sistemare');
@@ -347,9 +352,9 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
             <span class="val"><b>${it(c.v)}%</b></span></div>`).join('')}
         </div>
         <div class="panel duel">
-          <span class="lab">${f.lead ? 'Distacco dal secondo' : 'Distacco dal primo'}</span>
+          <span class="lab">${f.lead ? 'Vantaggio' : 'Margine di crescita'}</span>
           <div style="font-family:var(--f-display);font-weight:700;font-size:3.4cqw;line-height:1;color:${f.lead ? 'var(--accent)' : 'var(--r7)'}">${gap} punti</div>
-          <div>${f.lead ? (f.RU.length ? 'di vantaggio su ' + esc(f.RU[0].n) : 'di vantaggio') : 'di distacco da ' + esc(L0.n)}</div>
+          <div>${f.lead ? 'di vantaggio sul secondo' : 'di quota da recuperare per arrivare in testa'}</div>
           <div class="gap">Attività che compaiono almeno una volta nelle prime 3 posizioni: <b>${f.active} su ${f.total}</b></div>
         </div>
       </div>`); } });
