@@ -396,7 +396,7 @@ h1,h2,h3{font-family:'Space Grotesk',system-ui,sans-serif;font-weight:500;letter
 /* testata */
 .top{background:var(--bg);border-bottom:1px solid var(--ink)}
 .brand{gap:12px;font:500 21px 'Space Grotesk',system-ui,sans-serif;min-width:0}
-.brand .marchio{height:14px;width:auto;display:block;flex:none}
+.brand .marchio{height:22px;width:auto;display:block;flex:none}
 .brand .sep{width:1px;height:22px;background:var(--ink);flex:none}
 .brand #titolo{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sync{border-radius:0;background:transparent;border:0;padding:5px 2px;font:500 11.5px 'DM Mono',monospace;letter-spacing:.02em;color:var(--mute)}
@@ -525,7 +525,7 @@ html.avvio,html.avvio body{background:#141212}
 body.desk{grid-template-columns:232px minmax(0,1fr)}
 body.desk .top{grid-column:1/3;grid-row:1;background:#fff;padding:0 28px;border-bottom:1px solid var(--ink)}
 body.desk .brand{font-size:26px;gap:20px}
-body.desk .brand .marchio{height:17px}
+body.desk .brand .marchio{height:24px}
 body.desk .brand .sep{height:28px}
 body.desk .tab{grid-column:1;grid-row:2;background:#fff;border-right:1px solid var(--ink);padding:18px 14px 18px 0;gap:2px}
 body.desk .tab-brand{display:none}
