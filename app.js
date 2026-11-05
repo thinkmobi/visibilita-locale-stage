@@ -1531,7 +1531,7 @@ function vAltro() {
   <div class="row mt"><button class="btn pri" id="cSalva">Salva e prova</button><button class="btn" id="cInit">Prepara / aggiorna repository</button></div>
   <div id="cEsito" class="sub mt"></div>
   <div class="eb">Firma sui report</div>
-  <div class="due"><label class="f">Nome<input data-fi="nome" value="${esc(fi.nome || 'Hector Rinaldi')}"></label><label class="f">Ruolo<input data-fi="ruolo" value="${esc(fi.ruolo || 'Consulente visibilità locale')}"></label></div>
+  <div class="due"><label class="f">Nome<input data-fi="nome" value="${esc(fi.nome || 'Hector Rinaldi')}"></label><label class="f">Ruolo<input data-fi="ruolo" value="${esc(fi.ruolo ?? '')}"></label></div>
   <div class="due"><label class="f">Telefono<input data-fi="telefono" value="${esc(fi.telefono || '+39 351 894 2667')}"></label><label class="f">Email<input data-fi="email" value="${esc(fi.email || 'hector.rinaldi@italiaonline.it')}"></label></div>
   <div class="eb">Dati</div>
   <div class="row"><button class="btn" id="bkp">Scarica backup completo</button><button class="btn" id="csvAll">Esporta CSV (Excel)</button><button class="btn" id="aggiorna">Riscarica da GitHub</button></div>

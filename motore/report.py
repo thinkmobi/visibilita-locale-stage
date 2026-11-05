@@ -371,7 +371,7 @@ def right_column(c, cfg, rx, rw, top, k, extra, draw):
 def build(cfgs, out):
     W, H = A4
     c = canvas.Canvas(out, pagesize=A4)
-    c.setTitle(JOB.get("titolo_pdf", "Rilevazione di quartiere")); c.setAuthor(JOB["firma"]["nome"] + " Consulente")
+    c.setTitle(JOB.get("titolo_pdf", "Rilevazione di quartiere")); c.setAuthor(JOB["firma"]["nome"])
     for i in range(0, len(cfgs), 2):
         analysis(c, cfgs[i], 0, H / 2, W, H / 2)
         if i + 1 < len(cfgs): analysis(c, cfgs[i + 1], 0, 0, W, H / 2)
@@ -382,7 +382,7 @@ def build(cfgs, out):
     c.save()
 
 
-FIRMA = {"nome": "Hector Rinaldi", "ruolo": "Consulente visibilità locale",
+FIRMA = {"nome": "Hector Rinaldi", "ruolo": "",
          "telefono": "+39 351 894 2667", "email": "hector.rinaldi@italiaonline.it"}
 
 

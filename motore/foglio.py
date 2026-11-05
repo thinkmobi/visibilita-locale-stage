@@ -397,7 +397,7 @@ def genera_fogli(job, cartella, out, firma):
     LW, LH = landscape(A4)
     k = PW / LW
     c = canvas.Canvas(out, pagesize=A4)
-    c.setTitle(job.get("titolo_pdf", "Visibilità su Google")); c.setAuthor(firma["nome"] + " Consulente")
+    c.setTitle(job.get("titolo_pdf", "Visibilità su Google")); c.setAuthor(firma["nome"])
     fogli = job["fogli"]
     for i in range(0, len(fogli), 2):
         for j, f in enumerate(fogli[i:i + 2]):

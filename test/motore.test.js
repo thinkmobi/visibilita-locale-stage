@@ -33,7 +33,7 @@ function preparaCartella(jobExtra = {}) {
   const z = zona('2026-10-23');
   fs.writeFileSync(path.join(dir, 'zona.json'), JSON.stringify(z));
   const ps = [z.prospect.p1, z.prospect.p2, z.prospect.p4];
-  const job = { ...L.jobStampa(z, ps, { data: '2026-10-23', richiesta: 'richiesta-prova', firma: { nome: 'Prova Test', ruolo: 'Consulente', telefono: '+39 000 000 0000', email: 'prova@example.com' } }), ...jobExtra };
+  const job = { ...L.jobStampa(z, ps, { data: '2026-10-23', richiesta: 'richiesta-prova', firma: { nome: 'Prova Test', ruolo: '', telefono: '+39 000 000 0000', email: 'prova@example.com' } }), ...jobExtra };
   fs.writeFileSync(path.join(dir, 'stampa.json'), JSON.stringify(job));
   return { tmp, dir, job };
 }
