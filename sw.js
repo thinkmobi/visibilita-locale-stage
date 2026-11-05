@@ -1,7 +1,8 @@
 // Cache dell'app per l'uso offline. I dati (api.github.com) non passano mai da qui.
-const CACHE = 'vl-0.37.0';
+const CACHE = 'vl-0.38.0';
 const FILE = ['./', 'index.html', 'stile.css', 'app.js', 'logica.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
-  'motore/fonts/PlexSans-Regular.ttf', 'motore/fonts/PlexSans-Medium.ttf', 'motore/fonts/PlexSans-SemiBold.ttf', 'motore/fonts/PlexCond-Bold.ttf', 'motore/fonts/PlexMono-Medium.ttf'];
+  'marchio/agentica-logotipo-piccolo-positivo.svg',
+  'fonti/dm-mono-latin-400-normal.woff2', 'fonti/dm-mono-latin-500-normal.woff2', 'fonti/instrument-sans-latin-400-normal.woff2', 'fonti/instrument-sans-latin-500-normal.woff2', 'fonti/instrument-sans-latin-600-normal.woff2', 'fonti/space-grotesk-latin-500-normal.woff2', 'fonti/space-grotesk-latin-600-normal.woff2'];
 // produzione e stage stanno sullo stesso sito: ogni ambiente cancella solo le proprie cache vecchie (e quelle senza ambiente, delle versioni precedenti)
 const AMB = '@' + (/-stage\//.test(self.location.pathname) ? 'stage' : 'prod');
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE + AMB).then((c) => c.addAll(FILE))); self.skipWaiting(); });
