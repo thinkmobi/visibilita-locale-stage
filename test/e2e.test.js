@@ -575,7 +575,7 @@ test('11. computer: menu a sinistra, scheda nel pannello accanto all’elenco, E
     const nav = await t.page.locator('.tab').boundingBox();
     assert.ok(nav.x === 0 && nav.height > 600 && nav.width < 260, 'menu verticale a sinistra');
     assert.ok(await t.page.locator('.top .marchio').isVisible(), 'logo AGENTICA nella testata');
-    assert.equal(await t.page.locator('.tab').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(254, 62, 47)', 'barra laterale fluo');
+    assert.equal(await t.page.locator('.tab').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(255, 255, 255)', 'barra laterale bianca');
     assert.match(await t.page.locator('#nProspect').innerText(), /^\d+$/);
     await t.page.locator('#listaP a.card').first().click();
     await t.page.waitForSelector('#foglio:not([hidden]) .barra-salva');
@@ -601,6 +601,6 @@ test('11. computer: menu a sinistra, scheda nel pannello accanto all’elenco, E
     const nav = await m.page.locator('.tab').boundingBox();
     assert.ok(nav.y > 500 && nav.width === 390, 'telefono: barra in basso');
     assert.equal(await m.page.locator('.tab-brand').isVisible(), false);
-    assert.equal(await m.page.locator('.tab').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(254, 62, 47)', 'telefono: barra fluo');
+    assert.equal(await m.page.locator('.tab').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(255, 255, 255)', 'telefono: barra bianca');
   } finally { await m.chiudi(); }
 });
