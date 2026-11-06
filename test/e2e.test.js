@@ -635,3 +635,15 @@ test('20. «Appuntamento fissato»: chiede data e ora dell’incontro e le mostr
     assert.deepEqual(t.errori, []);
   } finally { await t.chiudi(); }
 });
+
+test('21. controllo siti: P.IVA ed email trovate sul sito si salvano nella scheda', async () => {
+  const t = await apri({ vista: 'prospect', mutaGh: (gh) => { gh.metti(`zone/${ID}/zona.json`, { ...zona(OGGI), id: ID }); gh.metti(`zone/${ID}/siti.json`, { aggiornato: '2026-11-06T09:00:00+00:00', siti: { 'alfa.example': { stato: 'ok', codice: 200, piva: '01234567897', email: 'info@alfa.example' } } }); } });
+  try {
+    await attendiStato(t.page, /Aggiornato|Salvato/);
+    await t.page.waitForFunction(() => /^Salvato/.test(document.querySelector('#syncTxt').textContent), null, { timeout: 15000 });
+    const p = Object.values(t.gh.json(`zone/${ID}/zona.json`).prospect).find((x) => x.pid === 'pA');
+    assert.equal(p.piva, '01234567897'); assert.equal(p.piva_fonte, 'sito');
+    assert.equal(p.email, 'info@alfa.example'); assert.equal(p.email_fonte, 'sito');
+    assert.deepEqual(t.errori, []);
+  } finally { await t.chiudi(); }
+});

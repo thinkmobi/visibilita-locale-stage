@@ -62,6 +62,12 @@ function pivaDaSiti() {
     if (ver && ver.piva) (domini[ver.piva] = domini[ver.piva] || new Set()).add(host(url));
   }
   const diRete = (n) => domini[n] && domini[n].size > 1;
+  const dominiE = {};
+  for (const s of Object.values(ST.zone)) for (const p of Object.values(s.z.prospect || {})) {
+    const url = p.sito || (s.z.attivita[p.pid] || {}).w; const ver = verificaSito(s.z, url);
+    if (ver && ver.email) (dominiE[ver.email] = dominiE[ver.email] || new Set()).add(host(url));
+  }
+  const emailRete = (e) => dominiE[e] && dominiE[e].size > 1;
   for (const [zid, s] of Object.entries(ST.zone)) {
     let cambiato = false;
     for (const p of Object.values(s.z.prospect || {})) if (p.piva_fonte === 'sito' && diRete(p.piva)) { p.piva = ''; delete p.piva_fonte; cambiato = true; }
@@ -69,6 +75,13 @@ function pivaDaSiti() {
       if (p.del || p.piva || p.piva_fonte) continue;   // già presente, o svuotata a mano
       const ver = verificaSito(s.z, p.sito || (s.z.attivita[p.pid] || {}).w);
       if (ver && ver.piva && pivaValida(ver.piva) && !diRete(ver.piva)) { p.piva = ver.piva; p.piva_fonte = 'sito'; cambiato = true; }   // senza toccare u: è un dato derivato, non vince sulle modifiche fatte altrove
+    }
+    // email trovata sul sito: stessa regola della P.IVA (si compila solo se vuota, mai quella di una rete su più domini)
+    for (const p of Object.values(s.z.prospect || {})) if (p.email_fonte === 'sito' && emailRete(p.email)) { p.email = ''; delete p.email_fonte; cambiato = true; }
+    for (const p of Object.values(s.z.prospect || {})) {
+      if (p.del || p.email || p.email_fonte) continue;
+      const ver = verificaSito(s.z, p.sito || (s.z.attivita[p.pid] || {}).w);
+      if (ver && ver.email && !emailRete(ver.email)) { p.email = ver.email; p.email_fonte = 'sito'; cambiato = true; }
     }
     if (cambiato) modificato(zid);
   }
@@ -777,7 +790,7 @@ function apriProspect(zid, id, opz = {}) {
   ${inp('nome', 'Nome')}${inp('referente', 'Referente')}
   <label class="f">Partita IVA<input data-c="piva" inputmode="numeric" autocomplete="off" maxlength="24" value="${esc(p.piva || '')}"></label>
   <div class="sub" id="pivaNota">${p.piva ? (pivaValida(p.piva) ? `✓ P.IVA valida${p.piva_fonte === 'sito' ? ' · trovata sul sito' : ''}` : '<span class="c-neg">P.IVA non valida: controlla le cifre</span>') : 'Si compila da sola se è scritta sul sito; altrimenti inseriscila a mano.'}</div>
-  <div class="due">${inp('telefono', 'Telefono', 'tel')}${inp('email', 'Email', 'email')}</div>
+  <div class="due">${inp('telefono', 'Telefono', 'tel')}${inp('email', 'Email', 'email')}</div>${p.email && p.email_fonte === 'sito' ? '<div class="sub">Email trovata sul sito</div>' : ''}
   ${inp('indirizzo', 'Indirizzo')}${inp('sito', 'Sito')}
   <div class="due"><label class="f">Prodotto proposto${sel('prodotto', PRODOTTI, p.prodotto)}</label>${inp('valore', 'Valore proposta (€)', 'number')}</div>
   <div class="due"><label class="f">Segmento${sel('segmento', ['Indipendente', 'Franchising'], p.segmento)}</label>${inp('visita_entro', 'Visita entro', 'date')}</div>
@@ -793,6 +806,7 @@ function apriProspect(zid, id, opz = {}) {
     const campi = { ...D }; if (Object.keys(DR).length) campi.report = { ...(pf.report || {}), ...DR };
     if ('nome' in campi) campi.nome = maiuscole(campi.nome);
     if ('referente' in campi) campi.referente = maiuscole(campi.referente, true);
+    if ('email' in campi) campi.email_fonte = 'manuale';
     if ('piva' in campi) {
       campi.piva = pulisciPiva(campi.piva); campi.piva_fonte = 'manuale';
       if (campi.piva && !pivaValida(campi.piva)) { toast('P.IVA non valida: correggila o lasciala vuota'); const el = $('[data-c=piva]'); if (el) el.focus(); return false; }
@@ -1522,6 +1536,7 @@ function salvaCella(el) {
   if (String(p[k] ?? '') === String(v)) return;
   const campi = { [k]: v };
   if (k === 'piva') campi.piva_fonte = 'manuale';
+  if (k === 'email') campi.email_fonte = 'manuale';
   if (k === 'stato' && CHIUSI.includes(v)) { campi.prossima = ''; campi.data_prossima = ''; }
   aggiorna(zid, id, campi); el.classList.remove('t-err'); el.classList.add('t-ok'); setTimeout(() => el.classList.remove('t-ok'), 900);
   if (k === 'referente') el.value = v;

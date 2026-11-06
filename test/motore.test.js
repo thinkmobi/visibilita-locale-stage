@@ -126,3 +126,20 @@ print(json.dumps({n: importa.abbina(n, idx) == atteso for n, atteso in casi.item
   const esiti = JSON.parse(r.stdout);
   for (const [n, ok] of Object.entries(esiti)) assert.ok(ok, 'abbinamento sbagliato: ' + n);
 });
+
+test('siti.py trova P.IVA ed email (mailto, testo, pagina contatti) e scarta gli indirizzi tecnici', () => {
+  const codice = `
+import sys; sys.path.insert(0, ${JSON.stringify(path.join(RADICE, 'motore'))})
+import siti, json
+home = '<a href="/contatti">Contatti</a><img src="logo@2x.png"><p>scritto da test@wixpress.com</p>'
+contatti = '<p>Rossi srl · P.IVA 01234567897 · <a href="mailto:Info@AgenziaRossi.it?subject=Info">scrivici</a> · mario@gmail.com</p>'
+siti.leggi = lambda u: contatti.lower() if u.endswith('/contatti') else ''
+e = {"finale": "https://www.agenziarossi.it/"}
+siti.dati_contatto(e, home.lower())
+print(json.dumps({"piva": e.get("piva"), "email": e.get("email"),
+  "gmail": siti.trova_email("<p>mario.rossi@gmail.com</p>", "https://x.it"),
+  "nessuna": siti.trova_email("<p>user@domain.com · a@sentry.io</p>", "https://x.it")}))`;
+  const r = esegui(PY, ['-c', codice]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { piva: '01234567897', email: 'info@agenziarossi.it', gmail: 'mario.rossi@gmail.com', nessuna: null });
+});

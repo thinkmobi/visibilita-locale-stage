@@ -2,7 +2,7 @@
 Uso: python motore/siti.py [zone/<id> ...]   (senza argomenti controlla tutte le zone)
 Stati: ok, dubbio (blocca i controlli, verificare a mano), ssl (certificato non valido), parcheggiato (dominio in vendita o scaduto),\ncostruzione, errore (HTTP 404/5xx), irraggiungibile (dominio inesistente o server spento).
 Il file è separato da zona.json, così il controllo non entra mai in conflitto con le modifiche fatte dall'app."""
-import json, os, re, sys, glob, ssl, time, errno, socket, html, urllib.request, urllib.error
+import json, os, re, sys, glob, ssl, time, errno, socket, html, urllib.request, urllib.error, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
@@ -69,6 +69,66 @@ def trova_piva(corpo):
     return None
 
 
+# indirizzi che non sono dell'attività: costruttori di siti, servizi tecnici, esempi
+EMAIL_NO = re.compile(r"(wixpress|sentry|example\.|esempio\.|^dominio\.|tuodominio|yourdomain|^domain\.com$|^e?mail\.com$|"
+                      r"godaddy|^register\.it$|wordpress|squarespace|jimdo|webnode|cloudflare|schema\.org|w3\.org)", re.I)
+EMAIL_RE = re.compile(r"[a-z0-9][a-z0-9._%+-]{0,63}@(?:[a-z0-9-]+\.)+[a-z]{2,10}", re.I)
+
+
+def _dominio(url):
+    return chiave(url).split("/")[0]
+
+
+def trova_email(corpo, url=""):
+    """email di contatto: prima i link mailto, poi il testo; preferisce quelle sullo stesso dominio del sito"""
+    corpo = html.unescape(corpo or "").replace("&#64;", "@").replace("[at]", "@").replace("(at)", "@")
+    trovate = [m.split("?")[0] for m in re.findall(r"mailto:([^\"'\s>]+)", corpo, re.I)]
+    testo = re.sub(r"(?s)<(script|style|noscript)\b.*?</\1>", " ", corpo)
+    trovate += EMAIL_RE.findall(_testo(testo))
+    buone = []
+    for e in trovate:
+        e = urllib.parse.unquote(e).strip(" .;,").lower()
+        if not EMAIL_RE.fullmatch(e) or EMAIL_NO.search(e.split("@")[1]) or re.search(r"\.(png|jpe?g|gif|webp|svg)$", e): continue
+        if e not in buone: buone.append(e)
+    dom = _dominio(url)
+    stesso = [e for e in buone if dom and (e.split("@")[1] == dom or dom.endswith("." + e.split("@")[1]))]
+    return (stesso or buone or [None])[0]
+
+
+PAGINE = re.compile(r"contatt|contact|chi-siamo|chi_siamo|about|privacy|note-legali|legal|impressum|dove-siamo", re.I)
+
+
+def pagine_interne(corpo, finale, n=3):
+    """fino a n link interni a pagine dove di solito stanno P.IVA ed email (contatti, privacy, note legali)"""
+    dom, visti = _dominio(finale), []
+    for href in re.findall(r"<a\b[^>]*href=[\"']([^\"'#]+)", corpo, re.I):
+        u = urllib.parse.urljoin(finale, html.unescape(href))
+        if not u.startswith("http") or _dominio(u) != dom or not PAGINE.search(u) or u in visti: continue
+        visti.append(u)
+        if len(visti) >= n: break
+    return visti
+
+
+def leggi(u):
+    ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
+    req = urllib.request.Request(u, headers={"User-Agent": UA, "Accept-Language": "it-IT,it;q=0.9", "Accept": "text/html"})
+    with urllib.request.urlopen(req, timeout=12, context=ctx) as r:
+        return r.read(200000).decode("utf-8", "ignore").lower()
+
+
+def dati_contatto(esito, corpo):
+    """P.IVA ed email dalla home; se mancano, dalle pagine contatti/privacy dello stesso sito"""
+    piva, email = trova_piva(corpo), trova_email(corpo, esito.get("finale", ""))
+    if not (piva and email):
+        for u in pagine_interne(corpo, esito.get("finale", "")):
+            try: c = leggi(u)
+            except Exception: continue
+            piva = piva or trova_piva(c); email = email or trova_email(c, esito.get("finale", ""))
+            if piva and email: break
+    if piva: esito["piva"] = piva
+    if email: esito["email"] = email
+
+
 def _scegli(ultimo, nuovo):
     """tiene l'indizio più forte tra il tentativo https e quello http"""
     if ultimo is None or FORZA.get(nuovo["stato"], 0) > FORZA.get(ultimo["stato"], 0): return nuovo
@@ -91,8 +151,7 @@ def visita(url):
                 with urllib.request.urlopen(req, timeout=15, context=ctx) as r:
                     corpo = r.read(120000).decode("utf-8", "ignore").lower()
                     esito = {"stato": "ok", "codice": r.status, "finale": r.geturl(), "ms": int((time.time() - t0) * 1000)}
-                    piva = trova_piva(corpo)
-                    if piva: esito["piva"] = piva
+                    dati_contatto(esito, corpo)
                     if not verifica_ssl or ssl_rotto:
                         esito.update(stato="ssl", nota="il sito risponde ma il certificato HTTPS non è valido")
                     tipo = classifica(corpo)
