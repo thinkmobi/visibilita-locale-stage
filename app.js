@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.40.2';
+const VERSIONE = '0.41.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -437,6 +437,8 @@ const ripassare = (z, p) => { if ((p.giro && p.giro.fatto) || !aperto(p)) return
 const badgeRC = (z, p) => (reportCompleto(z, p) && !/report completo/i.test(p.prossima || '') ? '<span class="badge-rc">Report completo da preparare</span>' : '');
 
 /* storia del cliente: tutti i contatti in un colpo d'occhio */
+const APP = 'Appuntamento fissato';
+const testoIncontro = (d, o) => (d ? `${gg(d)}${o ? ' alle ' + o : ''}` : '');
 const ESITO_TIPO = (e) => /Non interessato|Obiezione|Perso/.test(e) ? 'neg' : /Interessato|Appuntamento|Proposta|Firmato/.test(e) ? 'pos' : /report/i.test(e) ? 'rep' : 'att';
 const TIPO_RANGO = { neg: 4, pos: 3, rep: 2, att: 1 };
 const TIPO_SEGNO = { neg: '✕', pos: '✓', rep: '▤', att: '↻' };
@@ -452,9 +454,9 @@ function storiaCliente(reg) {
     const prim = es.slice().sort((a, b) => TIPO_RANGO[ESITO_TIPO(b)] - TIPO_RANGO[ESITO_TIPO(a)])[0] || canaleT(g.r[0].canale);
     const t = es.length ? ESITO_TIPO(prim) : 'att';
     const canali = [...new Set(g.r.map((r) => CANALE_ICO[canaleT(r.canale)] || ''))].join(' ');
-    return `<button type="button" class="st-seg st-${t}${k === giorni.length - 1 ? ' on' : ''}" data-stg="${k}"><span class="st-e">${TIPO_SEGNO[t]} ${esc(prim)}</span><span class="st-d">${gg(g.data)} · ${canali}${g.r.length > 1 ? ' · ×' + g.r.length : ''}</span></button>`;
+    return `<button type="button" class="st-seg st-${t}${k === giorni.length - 1 ? ' on' : ''}" data-stg="${k}"><span class="st-e">${TIPO_SEGNO[t]} ${esc(prim)}</span><span class="st-d">${prim === APP && g.r.find((r) => r.incontro) ? 'incontro ' + testoIncontro(g.r.find((r) => r.incontro).incontro, g.r.find((r) => r.incontro).ora) : gg(g.data) + ' · ' + canali}${g.r.length > 1 ? ' · ×' + g.r.length : ''}</span></button>`;
   };
-  const dett = giorni.map((g) => g.r.slice().reverse().map((r) => `<div class="st-r"><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}${r.interlocutore ? ' · con ' + esc(r.interlocutore) : ''}</span><div>${esitoBreve(r)}${r.emerso ? ' · ' + esc(r.emerso) : ''}</div></div>`).join(''));
+  const dett = giorni.map((g) => g.r.slice().reverse().map((r) => `<div class="st-r"><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}${r.interlocutore ? ' · con ' + esc(r.interlocutore) : ''}</span><div>${esitoBreve(r)}${r.incontro ? ' · <b>incontro il ' + testoIncontro(r.incontro, r.ora) + '</b>' : ''}${r.emerso ? ' · ' + esc(r.emerso) : ''}</div></div>`).join(''));
   return `<div class="box storia" data-dett="${esc(JSON.stringify(dett))}">
     <div class="riga"><span class="eb" style="margin:0">Storia del cliente</span><span class="data">dal ${gg(cr[0].data)} · ${durata} gg</span></div>
     <div class="st-num"><b>${reg.length}</b> contatti<span class="st-can">${Object.entries(perCanale).sort((x, y) => y[1] - x[1]).map(([c, n]) => `<span title="${esc(c)}">${CANALE_ICO[c] || esc(c)} ${n}</span>`).join('')}</span></div>
@@ -474,7 +476,8 @@ function posizionamento(z, p) {
 }
 function testoProspect(z, p, extra = '', opz = {}) {
   const g = urgenza(p); const ur = ultimoReg(z, p.id);
-  const quando = p.data_prossima ? (g < 0 ? `<span class="data c-neg">scaduta ${gg(p.data_prossima)}</span>` : g === 0 ? '<span class="data c-low">oggi</span>' : `<span class="data">${gg(p.data_prossima)}</span>`) : '';
+  const inc = p.incontro && p.incontro.data && p.incontro.data === p.data_prossima && aperto(p) ? p.incontro : null;
+  const quando = inc && g >= 0 ? `<span class="data${g === 0 ? ' c-low' : ''}">incontro ${g === 0 ? 'oggi' + (inc.ora ? ' ' + inc.ora : '') : testoIncontro(inc.data, inc.ora)}</span>` : p.data_prossima ? (g < 0 ? `<span class="data c-neg">scaduta ${gg(p.data_prossima)}</span>` : g === 0 ? '<span class="data c-low">oggi</span>' : `<span class="data">${gg(p.data_prossima)}</span>`) : '';
   return `<div class="riga"><span class="nome">${esc(p.nome)}</span>${quando}</div>
     <div class="riga"><span class="sub">${esc(p.stato)} · ${esc(z.meta.quartiere)}</span><span class="pill ${prioClasse(p)}">${prioHtml(p.priorita)}</span></div>
     ${ur ? `<div class="ultimo"><span>Ultimo contatto</span> <b>${esitoBreve(ur)}</b> · ${gg(ur.data)}</div>` : ''}
@@ -748,7 +751,7 @@ function apriProspect(zid, id, opz = {}) {
     <div class="eb" style="margin-top:0">Prossima azione</div>
     <label class="f">Stato${sel('stato', STATI, p.stato)}</label>
     <label class="f">Cosa fare<input data-c="prossima" value="${esc(p.prossima)}"></label>
-    <div class="due"><label class="f">Entro il<input data-c="data_prossima" type="date" value="${esc(p.data_prossima)}"></label>
+    <div class="due"><label class="f">${p.incontro && p.incontro.data === p.data_prossima ? "Data dell'incontro" + (p.incontro.ora ? ' · ' + esc(p.incontro.ora) : '') : 'Entro il'}<input data-c="data_prossima" type="date" value="${esc(p.data_prossima)}"></label>
     <label class="f">Priorità${sel('priorita', PRIORITA, p.priorita, prioTesto)}</label></div>
     <div class="scelte">${[0, 1, 3, 7].map((n) => `<button class="chip" data-quando="${n}">${n === 0 ? 'Oggi' : n === 1 ? 'Domani' : '+' + n + ' gg'}</button>`).join('')}</div>
   </div>
@@ -759,7 +762,7 @@ function apriProspect(zid, id, opz = {}) {
   ${an ? `<div class="box classifica"><b>${esc(an.list_title)}</b><table class="cl">${an.list.map(([r, n, rv, me]) => `<tr class="${me ? 'me' : ''}"><td>${r || '20+'}</td><td>${esc(n)}</td><td style="text-align:right" class="mono">${esc(rv)}</td></tr>`).join('')}</table></div>` : ''}` : '<div class="avviso mt">Attività non presente nella scansione della zona: niente metriche né report.</div>'}
   <div class="eb" id="registroP">Registro (${reg.length})</div>
   ${reg.map((r) => `<div class="reg"><div class="riga"><b>${esc(r.esito || r.canale)}</b><span class="data">${gg(r.data)} · ${esc(canaleT(r.canale))}</span></div>
-     ${r.interlocutore ? `<div class="sub">con ${esc(r.interlocutore)}</div>` : ''}${r.emerso ? `<div>${esc(r.emerso)}</div>` : ''}${r.prossima ? `<div class="sub">→ ${esc(r.prossima)} ${r.entro ? 'entro ' + esc(gg(r.entro)) : ''}</div>` : ''}
+     ${r.interlocutore ? `<div class="sub">con ${esc(r.interlocutore)}</div>` : ''}${r.emerso ? `<div>${esc(r.emerso)}</div>` : ''}${r.incontro ? `<div class="sub">→ Incontro il ${esc(testoIncontro(r.incontro, r.ora))}</div>` : r.prossima ? `<div class="sub">→ ${esc(r.prossima)} ${r.entro ? 'entro ' + esc(gg(r.entro)) : ''}</div>` : ''}
      <div class="reg-az"><button class="btn mini" data-rmod="${esc(r.id)}">Modifica</button><button class="btn mini neg-t" data-rdel="${esc(r.id)}">Elimina</button></div></div>`).join('') || '<div class="sub">Nessun contatto registrato.</div>'}
   <div class="eb">Giro</div>
   ${p.giro && p.giro.data
@@ -868,8 +871,8 @@ function formContatto(zid, id, preset = {}) {
   const fresco = () => (p = ST.zone[zid].z.prospect[id] || p);   // dopo una sincronizzazione il record in memoria è un altro oggetto
   // esiti a scelta multipla: stato e prossima azione seguono il più avanzato (l'ultimo nell'elenco ESITI)
   const rm = preset.modifica ? (ST.zone[zid].z.registro || {})[preset.modifica] : null;   // contatto da correggere
-  const v = rm ? { canale: canaleT(rm.canale) || 'Telefono', esiti: esitiDi(rm).slice(), interlocutore: rm.interlocutore || '', emerso: rm.emerso || '', prossima: rm.prossima || '', entro: rm.entro || '', stato: p.stato, data: rm.data || oggi() }
-    : { canale: preset.canale || 'Telefono', esiti: preset.esito ? [preset.esito] : [], interlocutore: p.referente || '', emerso: '', prossima: '', entro: '', stato: p.stato, data: oggi() };
+  const v = rm ? { canale: canaleT(rm.canale) || 'Telefono', esiti: esitiDi(rm).slice(), interlocutore: rm.interlocutore || '', emerso: rm.emerso || '', prossima: rm.prossima || '', entro: esitiDi(rm).includes(APP) ? (rm.incontro || '') : (rm.entro || ''), ora: rm.ora || '', stato: p.stato, data: rm.data || oggi() }
+    : { canale: preset.canale || 'Telefono', esiti: preset.esito ? [preset.esito] : [], interlocutore: p.referente || '', emerso: '', prossima: '', entro: '', ora: '', stato: p.stato, data: oggi() };
   // la scheda (stato, prossima azione) segue la modifica solo se il contatto corretto è il più recente
   let toccato = false;
   const ePiuRecente = () => !rm || (registro(zid, id)[0] || {}).id === rm.id;
@@ -877,8 +880,9 @@ function formContatto(zid, id, preset = {}) {
   const principale = () => v.esiti.slice().sort((a, b) => peso(a) - peso(b)).pop() || '';
   const proponi = () => {
     fresco(); const e = principale(); v.stato = statoDaEsito(p.stato, e);
-    const az = ESITO_AZIONE[e]; if (az) { v.prossima = az[0]; v.entro = piuGiorni(az[1], v.data); } else { v.prossima = ''; v.entro = ''; }
+    const az = ESITO_AZIONE[e]; if (az) { v.prossima = az[0]; v.entro = e === APP ? (v.incontroScelto || '') : piuGiorni(az[1], v.data); } else { v.prossima = ''; v.entro = ''; }
   };
+  const conIncontro = () => principale() === APP;
   if (!rm) proponi();
   const ch = (k, arr) => `<div class="scelte">${arr.map((o) => `<button class="chip ${(k === 'esito' ? v.esiti.includes(o) : v[k] === o) ? 'on' : ''}" data-k="${k}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}</div>`;
   const disegna = () => {
@@ -896,7 +900,7 @@ function formContatto(zid, id, preset = {}) {
     <label class="f">Cosa è emerso<textarea id="cEm">${esc(v.emerso)}</textarea></label>
     <div class="box"><div class="eb" style="margin-top:0">${rm && !ePiuRecente() ? 'Prossima azione annotata in questo contatto' : 'Dopo questo contatto'}</div>
     <label class="f">Prossima azione<input id="cPr" value="${esc(v.prossima)}"></label>
-    <div class="due"><label class="f">Entro il<input id="cEn" type="date" value="${v.entro}"></label>
+    ${conIncontro() ? `<div class="due"><label class="f">Data dell'incontro<input id="cEn" type="date" value="${v.entro}"></label><label class="f">Ora<input id="cOra" type="time" step="900" value="${esc(v.ora)}"></label></div><div class="due">` : `<div class="due"><label class="f">Entro il<input id="cEn" type="date" value="${v.entro}"></label>`}
     <label class="f" ${rm && !ePiuRecente() ? 'style="display:none"' : ''}>Nuovo stato<select id="cSt">${STATI.map((s) => `<option value="${esc(s)}" ${s === v.stato ? 'selected' : ''}>${s}</option>`).join('')}</select></label></div><div class="sub" id="cStNota"></div></div>
     <div class="barra-salva"><button class="btn annulla" id="annullaC">Annulla</button><button class="btn pri" id="salva">Salva contatto</button></div>`, () => annullaC());
     const sporcoC = () => (rm ? toccato : v.esiti.length > 0 || !!v.emerso.trim());
@@ -911,8 +915,8 @@ function formContatto(zid, id, preset = {}) {
     aggiornaBarra(); avvisoStato();
     $('#cSt', f).onchange = avvisoStato;
     $('#cEm', f).oninput = () => { v.emerso = $('#cEm', f).value; toccato = true; aggiornaBarra(); };
-    ['#cData', '#cInt', '#cPr', '#cEn', '#cSt'].forEach((q) => { const el = $(q, f); if (el) el.addEventListener('input', () => { toccato = true; aggiornaBarra(); }); });
-    const leggi = () => { v.data = $('#cData').value; v.interlocutore = $('#cInt').value; v.emerso = $('#cEm').value; v.prossima = $('#cPr').value; v.entro = $('#cEn').value; v.stato = $('#cSt').value; };
+    ['#cData', '#cInt', '#cPr', '#cEn', '#cOra', '#cSt'].forEach((q) => { const el = $(q, f); if (el) el.addEventListener('input', () => { toccato = true; aggiornaBarra(); }); });
+    const leggi = () => { v.data = $('#cData').value; v.interlocutore = $('#cInt').value; v.emerso = $('#cEm').value; v.prossima = $('#cPr').value; v.entro = $('#cEn').value; v.stato = $('#cSt').value; const o = $('#cOra'); if (o) v.ora = o.value; if (conIncontro()) v.incontroScelto = v.entro; };
     f.querySelectorAll('[data-k]').forEach((b) => (b.onclick = () => {
       leggi(); toccato = true;
       if (b.dataset.k === 'esito') { // tocco = aggiungi o togli; proposta automatica, modificabile
@@ -923,15 +927,18 @@ function formContatto(zid, id, preset = {}) {
     }));
     $('#salva').onclick = () => {
       leggi(); fresco(); if (!v.esiti.length) { toast('Scegli almeno un esito'); return; }
+      if (conIncontro() && !v.entro) { toast("Indica la data dell'incontro"); $('#cEn').focus(); return; }
       if (!v.data) v.data = oggi();   // su iPhone il campo data si può svuotare con "Reset"
       const esiti = v.esiti.slice().sort((a, b) => ESITI.indexOf(a) - ESITI.indexOf(b));
       const z = ST.zone[zid].z; z.registro = z.registro || {};
       const voce = { p: id, data: v.data, canale: v.canale, interlocutore: maiuscole(v.interlocutore, true), esito: esiti.join(' · '), esiti, emerso: v.emerso, prossima: v.prossima, entro: v.entro };
+      if (esiti.includes(APP)) { voce.incontro = v.entro; voce.ora = v.ora || ''; } else { voce.incontro = ''; voce.ora = ''; }
       if (rm) {
         const att = z.registro[rm.id] || rm; z.registro[rm.id] = { ...att, ...voce, u: nuovoU(att) };
         if (!ePiuRecente()) { modificato(zid); apriProspect(zid, id, { salvato: 'Contatto corretto' }); return; }
       } else { const rid = uid(); z.registro[rid] = { id: rid, ...voce, u: ora() }; }
       const campi = { stato: v.stato, prossima: CHIUSI.includes(v.stato) ? '' : v.prossima, data_prossima: CHIUSI.includes(v.stato) ? '' : v.entro };
+      if (esiti.includes(APP)) campi.incontro = { data: v.entro, ora: v.ora || '' };
       if (v.interlocutore && !p.referente) campi.referente = maiuscole(v.interlocutore, true);
       // la tappa è consegnata solo se il contatto è del giorno del giro o successivo: un contatto passato registrato dal giro non la chiude
       if (preset.giro && p.giro && p.giro.data && v.data >= p.giro.data) campi.giro = { ...p.giro, fatto: true, fatto_il: v.data };

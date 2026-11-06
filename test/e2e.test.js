@@ -604,3 +604,34 @@ test('11. computer: menu a sinistra, scheda nel pannello accanto all’elenco, E
     assert.equal(await m.page.locator('.tab').evaluate((e) => getComputedStyle(e).backgroundColor), 'rgb(255, 255, 255)', 'telefono: barra bianca');
   } finally { await m.chiudi(); }
 });
+
+test('20. «Appuntamento fissato»: chiede data e ora dell’incontro e le mostra al posto della data del contatto', async () => {
+  const t = await apri({ vista: 'prospect' });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    await t.page.locator(`a.card[href="#p/${ID}/p1"]`).click();
+    await t.page.locator('#registra').click();
+    await t.page.locator('[data-k=esito][data-v="Appuntamento fissato"]').click();
+    assert.match(await t.page.locator('label:has(#cEn)').innerText(), /Data dell'incontro/);
+    assert.equal(await t.page.locator('#cEn').inputValue(), '', 'la data dell’incontro non è precompilata con oggi');
+    await t.page.locator('#salva').click();
+    await t.page.waitForSelector('#cEn');   // senza data il contatto non si salva
+    const d = new Date(OGGI); d.setDate(d.getDate() + 5); const inc = d.toISOString().slice(0, 10);
+    await t.page.locator('#cEn').fill(inc); await t.page.locator('#cOra').fill('10:30');
+    if (process.env.FOTO) await t.page.waitForFunction(() => !document.getElementById('splash'));
+    if (process.env.FOTO) await t.page.locator('.foglio .box').last().screenshot({ path: process.env.FOTO + '-a.png' });
+    await t.page.locator('#salva').click();
+    await t.page.waitForSelector('.storia');
+    const gg = inc.slice(8, 10) + '/' + inc.slice(5, 7);
+    assert.match(await t.page.locator('.st-seg.on .st-d').innerText(), new RegExp('incontro ' + gg + ' alle 10:30'));
+    if (process.env.FOTO) await t.page.locator('.storia').screenshot({ path: process.env.FOTO + '-b.png' });
+    assert.match(await t.page.locator('.st-dett').innerText(), new RegExp('incontro il ' + gg + ' alle 10:30'));
+    await t.page.waitForFunction(() => /^Salvato/.test(document.querySelector('#syncTxt').textContent), null, { timeout: 8000 });
+    const z = t.gh.json(`zone/${ID}/zona.json`);
+    assert.deepEqual(z.prospect.p1.incontro, { data: inc, ora: '10:30' });
+    assert.equal(z.prospect.p1.data_prossima, inc);
+    const r = Object.values(z.registro).find((x) => x.p === 'p1' && x.incontro);
+    assert.equal(r.incontro, inc); assert.equal(r.ora, '10:30');
+    assert.deepEqual(t.errori, []);
+  } finally { await t.chiudi(); }
+});
