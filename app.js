@@ -970,7 +970,7 @@ async function disegnaMappaGiro() {
     pin.push({ p, mk: L0.marker([p.la, p.lo], { icon: icona, title: p.nome, keyboard: true }).addTo(m).on('click', () => { location.hash = `#p/${p.zid}/${p.id}`; }) });
   }
   // tappe vicine: sullo schermo i pin si distanziano di pochi pixel (la posizione reale e il percorso tratteggiato restano quelli veri), così ogni numero si legge
-  const distanzia = () => { for (const o of L.distanziaPin(pin.map((x) => m.latLngToContainerPoint([x.p.la, x.p.lo])))) pin[o.i].mk.setLatLng(m.containerPointToLatLng(L0.point(o.x, o.y))); };
+  const distanzia = () => { for (const o of L.distanziaPin(pin.map((x) => { const q = m.latLngToContainerPoint([x.p.la, x.p.lo]); return { x: q.x, y: q.y, k: x.p.zid + '|' + x.p.id }; }))) pin[o.i].mk.setLatLng(m.containerPointToLatLng(L0.point(o.x, o.y))); };
   m.on('zoomend', distanzia);
   m.fitBounds(L0.latLngBounds(ordinati.map((p) => [p.la, p.lo])).pad(0.15), { maxZoom: 17 });
   distanzia();

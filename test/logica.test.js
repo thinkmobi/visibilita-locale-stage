@@ -212,6 +212,16 @@ test('distanziaPin: i pin sovrapposti si separano, gli altri restano', () => {
   for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) assert.ok(Math.hypot(tre[i].x - tre[j].x, tre[i].y - tre[j].y) >= 28);
 });
 
+test('distanziaPin: cambiando l\'ordine delle tappe ogni pin resta al suo posto', () => {
+  const A = { x: 100, y: 100, k: 'z|A' }, B = { x: 106, y: 103, k: 'z|B' }, C = { x: 103, y: 108, k: 'z|C' };
+  const pos = (arr) => Object.fromEntries(L.distanziaPin(arr).map((o) => [arr[o.i].k, [Math.round(o.x), Math.round(o.y)]]));
+  assert.deepEqual(pos([A, B, C]), pos([B, A, C]));
+  assert.deepEqual(pos([A, B, C]), pos([C, B, A]));
+  const p = pos([A, B]); assert.ok(p['z|A'][0] < p['z|B'][0], 'il pin più a ovest resta a ovest');
+  const U = { x: 50, y: 50, k: 'z|U' }, V = { x: 50, y: 50, k: 'z|V' };
+  assert.deepEqual(pos([U, V]), pos([V, U]), 'coordinate identiche: decide la chiave');
+});
+
 test('analisi dedicata: dati del deck dalla zona (griglie, quote nelle prime 3, nome file)', () => {
   const D = L.datiAnalisi(z, 'pA', { nome: 'Agenzia Alfa' });
   assert.equal(D.business.name, 'Agenzia Alfa');

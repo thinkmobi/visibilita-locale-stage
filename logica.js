@@ -174,7 +174,12 @@
       if (ids.length < 2) continue;
       const cx = ids.reduce((a, i) => a + pt[i].x, 0) / ids.length, cy = ids.reduce((a, i) => a + pt[i].y, 0) / ids.length;
       const r = 15 / Math.sin(Math.PI / ids.length);   // pin da 28 px: centri a 30 px almeno
-      ids.forEach((i, k) => { const a = -Math.PI / 2 + (2 * Math.PI * k) / ids.length; out[i].x = cx + r * Math.cos(a); out[i].y = cy + r * Math.sin(a); });
+      // posto di ogni pin nel cerchio: dalla sua direzione reale rispetto al centro del gruppo, non dall'ordine della lista,
+      // così spostando una tappa nel giro ogni pin resta al suo posto e cambia solo il numero (con coordinate uguali decide la chiave k)
+      const ang = (i) => Math.atan2(pt[i].y - cy, pt[i].x - cx);
+      const ord = [...ids].sort((p, q) => ang(p) - ang(q) || String(pt[p].k || '').localeCompare(String(pt[q].k || '')) || p - q);
+      const a0 = Math.hypot(pt[ord[0]].x - cx, pt[ord[0]].y - cy) > .5 ? ang(ord[0]) : -Math.PI / 2;
+      ord.forEach((i, k) => { const a = a0 + (2 * Math.PI * k) / ids.length; out[i].x = cx + r * Math.cos(a); out[i].y = cy + r * Math.sin(a); });
     }
     return out;
   };
