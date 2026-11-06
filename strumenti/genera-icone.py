@@ -41,8 +41,8 @@ html,body{{margin:0;background:transparent}} text{{font-family:SG;font-weight:60
 </style></head><body><svg id="s" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">{contenuto}</svg></body></html>'''
 
 ICONE = [  # file, lato, scala, sfondo
-    ('icon-512.png', 512, 1.0, None),
-    ('icon-192.png', 192, 1.0, None),
+    ('icon-512.png', 512, 0.94, INK),
+    ('icon-192.png', 192, 0.94, INK),
     ('icon-maskable-512.png', 512, 0.78, INK),   # contenuto nella zona sicura (cerchio 80%)
     ('icon-maskable-192.png', 192, 0.78, INK),
     ('apple-touch-icon.png', 180, 0.94, INK),
