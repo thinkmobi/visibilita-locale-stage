@@ -467,9 +467,10 @@ select.ora{border:1px solid var(--ink);border-radius:0}
 .badge-rc{background:#E6E9EE;color:var(--notte);border:0}
 /* tappe del giro */
 .num{border-radius:0;background:var(--ink);color:var(--bg);border:0;font:600 14px 'Space Grotesk',system-ui,sans-serif}
-.ok-fatto{background:#fff}.ok-fatto .num{background:var(--bosco-t);color:var(--bosco-ink);border:0}
+.ok-fatto{background:#fff}.ok-fatto .num{background:#E9EAEB;color:#4A4F54;border:0}
 .stato-tappa{border-radius:0;background:#fff;color:var(--ink);border:1px solid var(--ink)}
-.stato-tappa.consegnata{background:var(--bosco-t);color:var(--bosco-ink);border-color:var(--bosco-t)}
+.stato-tappa.consegnata{background:#E9EAEB;color:#4A4F54;border-color:#E9EAEB}
+.stato-tappa.app{background:#E3F2E6;color:#17692F;border-color:#E3F2E6}.stato-tappa.app.passato{background:#fff;border-color:#1E8E3E}
 .stato-tappa.ripassare{background:var(--oro-t);color:var(--oro-ink);border-color:var(--oro-t)}
 .stato-tappa.visitata{background:var(--soft);color:var(--ink);border-color:var(--soft)}
 .stato-tappa.rc{background:#E6E9EE;color:var(--notte);border-color:#E6E9EE}
@@ -483,7 +484,8 @@ select.ora{border:1px solid var(--ink);border-radius:0}
 .mg-pin.rip{background:#F6C026;color:var(--ink);border-color:#fff}
 .mg-pin.rc{background:#1A73E8;color:#fff;border-color:#fff}
 .mg-pin.ni{background:var(--granata);color:#fff;border-color:#fff}
-.mg-pin.fatto{background:#177A35;color:#fff;border-color:#fff}
+.mg-pin.fatto{background:#8A8F93;color:#fff;border-color:#fff}
+.mg-pin.app{background:#1E8E3E;color:#fff;border-color:#fff}
 .mappa-legenda .mg-pin{border-width:1.5px;border-color:transparent}.mappa-legenda .mg-pin.vis{border-color:var(--ink)}.mappa-legenda .mg-pin.rip{border-color:#B88A00}
 /* barre AI Mode e Maps */
 .pos-t,.barra{border-radius:0;background:var(--soft)}.pos-t i{border-radius:0}
@@ -505,12 +507,12 @@ table.cl tr.me td{background:#E6E9EE}
 .st-seg:first-child{border-radius:0}
 /* Zone: accesso alle analisi */
 .an-link{background:var(--ink);color:var(--bg);border-left:0}
-.an-link .sub{color:#C9CFD8}.an-link .pill{background:var(--fluo);color:var(--ink)}
+.an-link .sub{color:#C9CFD8}.an-link .pill{background:var(--fluo);color:#fff}
 .an-frame{border-radius:0}
 /* tabella */
 .t-box{border:0;border-radius:0}
 .tabella th{background:var(--ink);font:500 11px 'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase}
-.tabella th.ord{background:var(--fluo);color:var(--ink)}
+.tabella th.ord{background:var(--fluo);color:#fff}
 .tabella tr:hover{background:#FBFAF6}
 .tabella input,.tabella select{border-radius:0}
 /* splash: nero, logotipo in negativo, etichette in oro */
@@ -532,9 +534,9 @@ body.desk .tab-brand{display:none}
 body.desk .tab a{padding:11px 18px 11px 26px;border-radius:0;color:#3A4350;font-size:15px;font-weight:500}
 body.desk .tab a:hover{background:var(--bg)}
 body.desk .tab a.on{background:var(--ink);color:#fff;font-weight:600;box-shadow:inset 4px 0 var(--fluo)}
-body.desk .tab-n{border-radius:0;background:var(--fluo);color:var(--ink);font:500 11px/18px 'DM Mono',monospace}
-body.desk .tab-n-neg{background:var(--fluo);color:var(--ink)}
-body.desk .tab a.on .tab-n{background:var(--fluo);color:var(--ink)}
+body.desk .tab-n{border-radius:0;background:var(--fluo);color:#fff;font:500 11px/18px 'DM Mono',monospace}
+body.desk .tab-n-neg{background:var(--fluo);color:#fff}
+body.desk .tab a.on .tab-n{background:var(--fluo);color:#fff}
 body.desk .tab-piede{padding:10px 26px 0;color:var(--mute);font:500 11px 'DM Mono',monospace;letter-spacing:.06em}
 body.desk .vista{grid-column:2;grid-row:2}
 body.desk .foglio{top:var(--top-h);width:560px;max-width:calc(100vw - 232px);border-left:1px solid var(--ink);box-shadow:-12px 0 32px rgba(20,18,18,.16)}
@@ -554,3 +556,14 @@ body.desk .n-desk>div{border:0;border-radius:0}
 .c-top{color:#177A35}
 .griglia i.g-r{color:var(--ink)}
 .griglia i.g-2{color:var(--ink)}
+
+/* percentuali al posto della mini mappa nelle liste */
+.mini-pct{flex:none;width:74px;display:flex;flex-direction:column;gap:6px;align-self:flex-start;margin-top:2px}
+.mini-pct .mp-v{background:#fff;border:1px solid var(--line);padding:5px 7px 4px;display:flex;flex-direction:column;gap:1px;color:var(--ink)}
+.mini-pct .mp-v span{font:500 9.5px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:.04em;opacity:.85}
+.mini-pct .mp-v b{font:600 21px/1.05 'Space Grotesk',system-ui,sans-serif;color:inherit}.mini-pct .mp-v.nd{color:var(--mute)}
+/* colori pieni: 0-32 rosso, 33-66 arancione, 67-100 verde */
+.mini-pct .mp-v.top{background:#1E8E3E;border-color:#1E8E3E;color:#fff}
+.mini-pct .mp-v.mid{background:#F29529;border-color:#F29529;color:#fff}
+.mini-pct .mp-v.low{background:#C5221F;border-color:#C5221F;color:#fff}
+.mini-pct.vuota{border:1px dashed var(--line);padding:8px 6px;font:500 10px 'DM Mono',monospace;color:var(--mute);text-transform:uppercase}

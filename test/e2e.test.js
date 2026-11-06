@@ -289,17 +289,33 @@ test('8d. elenco attività della zona: indicatori dei prospect (priorità, top 3
   } finally { await t.chiudi(); }
 });
 
-test('8e. liste: barre del posizionamento con la quota di zone tra i primi 3 (Maps; AI Mode sopra quando c’è)', async () => {
+test('8e. liste: percentuali AI Mode e Maps tra i primi 3 al posto della mini mappa, con colori pieni per fascia', async () => {
   const t = await apri({ vista: 'prospect' });
   try {
     await attendiStato(t.page, /Aggiornato/);
     const card = t.page.locator(`a.card[href="#p/${ID}/p1"]`);
     await card.waitFor();
-    const testo = await card.locator('.pos').innerText();
+    const testo = await card.locator('.mini-pct').innerText();
     assert.match(testo, /MAPS\s*\d+%/i);
     assert.doesNotMatch(testo, /top 20|presente/i);
-    const w = await card.locator('.pos-t i').first().evaluate((e) => e.style.width);
-    assert.match(w, /^\d+%$/);
+    assert.equal(await card.locator('svg.mini').count(), 0, 'niente mini mappa');
+    const v = await card.locator('.mini-pct .mp-v').last().evaluate((e) => ({ cl: e.className, n: parseInt(e.querySelector('b').textContent, 10), col: getComputedStyle(e).color }));
+    const atteso = v.n >= 67 ? 'top' : v.n >= 33 ? 'mid' : 'low';
+    assert.ok(v.cl.includes(atteso), `fascia ${atteso} per ${v.n}%`); assert.equal(v.col, 'rgb(255, 255, 255)');
+  } finally { await t.chiudi(); }
+});
+
+test('8e-bis. giro: «Ordina per valore» mette prima le tappe con la percentuale più bassa', async () => {
+  const t = await apri({ vista: 'giro', mutaGh: (gh) => { const z = zona(OGGI); z.id = ID; Object.assign(z.prospect.p4, { giro: { data: OGGI, ordine: 3 } }); gh.metti(`zone/${ID}/zona.json`, z); } });
+  try {
+    await attendiStato(t.page, /Aggiornato/);
+    await t.page.locator('[data-gvalore]').first().click();
+    await t.page.waitForFunction(() => /^Salvato/.test(document.querySelector('#syncTxt').textContent), null, { timeout: 8000 });
+    const pr = t.gh.json(`zone/${ID}/zona.json`).prospect;
+    const valori = await t.page.evaluate(() => [...document.querySelectorAll('.tappa .mini-pct .mp-v:last-child b')].map((b) => parseInt(b.textContent, 10)));
+    assert.ok(valori.length >= 2); assert.deepEqual(valori, [...valori].sort((a, b) => a - b), 'percentuali in ordine crescente: ' + valori);
+    assert.deepEqual(Object.values(pr).filter((p) => p.giro && p.giro.data === OGGI).map((p) => p.giro.ordine).sort(), [1, 2, 3]);
+    assert.deepEqual(t.errori, []);
   } finally { await t.chiudi(); }
 });
 

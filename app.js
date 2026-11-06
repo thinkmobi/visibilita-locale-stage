@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.41.0';
+const VERSIONE = '0.42.0';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -409,6 +409,13 @@ function miniMappa(z, p, px = 54) {
   }));
   return `<svg class="mini" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}" role="img" aria-label="Mappa di visibilità">${dots}</svg>`;
 }
+/* nelle liste, al posto della mini mappa: quota di zone tra i primi 3, AI Mode sopra Maps (etichetta sopra il numero) */
+function miniPct(z, p) {
+  if (!p.pid || !z.punti || !z.punti.length || !z.attivita[p.pid]) return '<div class="mini-pct vuota"><span>Non nella scansione</span></div>';
+  const m = L.metriche(z, p.pid), ai = L.metricheAI(z, p.pid);
+  const voce = (l, v) => v == null ? `<div class="mp-v nd"><span>${l}</span><b>—</b></div>` : `<div class="mp-v ${L.colorePct(v)}"><span>${l}</span><b>${v}%</b></div>`;
+  return `<div class="mini-pct" title="Zone in cui compare tra i primi 3">${voce('AI Mode', ai ? L.pct(ai.top3, ai.N) : null)}${voce('Maps', L.pct(m.top3, m.N))}</div>`;
+}
 /* stato del sito: dominio proprio, solo portale o social, sito Google dismesso, nessun sito */
 const PORTALI = /(^|\.)(immobiliare\.it|idealista\.it|casa\.it|wikicasa\.it|subito\.it|trovacasa\.net|paginegialle\.it|tripadvisor\.|thefork\.|booking\.com|miodottore\.it|treatwell\.it)$/i;
 const SOCIAL = /(^|\.)(facebook\.com|fb\.com|instagram\.com|linktr\.ee|wa\.me|tiktok\.com|linkedin\.com)$/i;
@@ -442,6 +449,12 @@ const ultimoReg = (z, pid) => Object.values(z.registro || {}).filter((r) => !r.d
 // report completo richiesto e non ancora consegnato: ultimo esito "Fare report completo" o prossima azione sul report completo
 const reportCompleto = (z, p) => { if (!aperto(p)) return false; const ur = ultimoReg(z, p.id); return /report completo/i.test(p.prossima || '') || !!(ur && esitiDi(ur).includes('Fare report completo')); };
 // non interessato: stato Perso o ultimo esito "Non interessato"
+// appuntamento: prospect aperto con visita fissata o ultimo esito «Appuntamento fissato»; data e ora dell'incontro in p.incontro
+const appuntamento = (z, p) => { if (!aperto(p)) return false; if (p.stato === 'Visita fissata') return true; const ur = ultimoReg(z, p.id); return !!(ur && esitiDi(ur).includes('Appuntamento fissato')); };
+const dataIncontro = (p) => (p.incontro && p.incontro.data) || '';
+const etichettaIncontro = (p) => { const d = dataIncontro(p); if (!d) return '<span class="stato-tappa app">Appuntamento · data da inserire</span>';
+  const o = p.incontro.ora ? ' alle ' + esc(p.incontro.ora) : ''; const g = giorni(d);
+  return g < 0 ? `<span class="stato-tappa app passato">Incontro del ${gg(d)} · aggiorna l'esito</span>` : `<span class="stato-tappa app">Incontro ${g === 0 ? 'oggi' : g === 1 ? 'domani' : 'il ' + gg(d)}${o}</span>`; };
 const nonInteressato = (z, p) => { if (p.stato === 'Perso') return true; const ur = ultimoReg(z, p.id); return !!(ur && esitiDi(ur).includes('Non interessato')); };
 // in lavoro: tutti tranne i non interessati, che restano visibili solo con il filtro «Non interessati»
 const inLavoro = (x) => !nonInteressato(x.z, x.p);
@@ -495,11 +508,10 @@ function testoProspect(z, p, extra = '', opz = {}) {
     <div class="riga"><span class="sub">${esc(p.stato)} · ${esc(z.meta.quartiere)}</span><span class="pill ${prioClasse(p)}">${prioHtml(p.priorita)}</span></div>
     ${ur ? `<div class="ultimo"><span>Ultimo contatto</span> <b>${esitoBreve(ur)}</b> · ${gg(ur.data)}</div>` : ''}
     ${p.prossima ? `<div class="az">→ ${esc(p.prossima)}</div>` : aperto(p) ? '<div class="az c-low">Nessuna prossima azione</div>' : ''}
-    ${posizionamento(z, p)}
     <div class="badges">${opz.senzaRC ? '' : badgeRC(z, p)}${badgeSito(z, p)}${badgePG(p)}${nonRiv(z, p) ? '<span class="badge-nr"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.5"/></svg>Scheda non rivendicata</span>' : ''}</div>${extra}`;
 }
 function cardProspect({ zid, z, p }, extra = '') {
-  return `<a class="card con-mappa ${classeCard(p)}" href="#p/${zid}/${p.id}">${miniMappa(z, p)}<div class="card-testo">${testoProspect(z, p, extra)}</div></a>`;
+  return `<a class="card con-mappa ${classeCard(p)}" href="#p/${zid}/${p.id}">${miniPct(z, p)}<div class="card-testo">${testoProspect(z, p, extra)}</div></a>`;
 }
 function vOggi() {
   const tt = tutti(); const tl = tt.filter(inLavoro); const ap = tl.filter((x) => aperto(x.p));
@@ -526,7 +538,9 @@ function vOggi() {
   const tappa = (x) => `<div class="riga" style="margin-top:4px"><span class="sub">${esc(x.p.giro.orario || '')}${x.p.giro.orario ? ' · ' : ''}tappa ${numTappa[x.zid + '|' + x.p.id] || ''}</span>${ripassare(x.z, x.p) ? '<span class="stato-tappa ripassare">↻ Ripassare</span>' : '<span class="stato-tappa">Visitare</span>'}</div>`;
   const esitoOggi = (x) => { const r = ultimoOggi(x); return `<div class="riga" style="margin-top:4px">${x.p.giro && x.p.giro.data === d && x.p.giro.fatto ? '<span class="stato-tappa consegnata">✓ Consegnato</span>' : ''}${r ? `<span class="sub">Oggi: ${esc(r.esito)}</span>` : ''}</div>`; };
   const vuoto = !giroDaFare.length && !richiami.length;
-  return `<div class="o-desk"><div class="o-kpi">${kpi}</div>
+  const apps = tl.filter((x) => appuntamento(x.z, x.p)).sort((a, b) => (dataIncontro(a.p) || '9999').localeCompare(dataIncontro(b.p) || '9999') || ((a.p.incontro || {}).ora || '').localeCompare((b.p.incontro || {}).ora || ''));
+  const sezApp = apps.length ? `<div class="o-app"><div class="eb">Appuntamenti · ${apps.length}</div><div class="lista">${apps.map((x) => cardProspect(x, !dataIncontro(x.p) || giorni(dataIncontro(x.p)) < 0 ? `<div class="riga" style="margin-top:4px">${etichettaIncontro(x.p)}</div>` : '')).join('')}</div></div>` : '';
+  return `<div class="o-desk"><div class="o-kpi">${kpi}</div>${sezApp}
   <div class="o-giro"><div class="eb">Da fare oggi · ${ggLungo(d)} · ${giroDaFare.length + richiami.length} da contattare${fatti.length ? ` · ${fatti.length} già sentiti` : ''}</div>
   ${giro.length ? `<div class="row" style="margin-bottom:8px"><a class="btn mini" href="#giro">Apri il giro (${((n) => n + (n === 1 ? ' tappa' : ' tappe'))(giro.filter(inLavoro).length)})</a></div>` : ''}
   ${giroDaFare.length ? `<div class="sub" style="margin:2px 0 6px">Giro di oggi</div><div class="lista">${giroDaFare.map((x) => cardProspect(x, tappa(x))).join('')}</div>` : ''}
@@ -987,7 +1001,7 @@ async function disegnaMappaGiro() {
   for (const zid of new Set(pts.map((p) => p.zid))) L0.polyline(pts.filter((p) => p.zid === zid).map((p) => [p.la, p.lo]), { color: '#18232A', weight: 2, opacity: .45, dashArray: '4 6' }).addTo(m);
   const pin = [];
   for (const p of ordinati) {
-    const icona = L0.divIcon({ className: '', html: `<span class="mg-pin ${p.ni ? 'ni' : p.rc ? 'rc' : p.fatto ? 'fatto' : p.rip ? 'rip' : p.vis ? 'vis' : ''}">${p.ni ? '✕' : p.fatto && !p.rc ? '✓' : esc(String(p.n || ''))}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] });
+    const icona = L0.divIcon({ className: '', html: `<span class="mg-pin ${p.ni ? 'ni' : p.app ? 'app' : p.rc ? 'rc' : p.fatto ? 'fatto' : p.rip ? 'rip' : p.vis ? 'vis' : ''}">${p.ni ? '✕' : p.fatto && !p.rc ? '✓' : esc(String(p.n || ''))}</span>`, iconSize: [28, 28], iconAnchor: [14, 14] });
     pin.push({ p, mk: L0.marker([p.la, p.lo], { icon: icona, title: p.nome, keyboard: true }).addTo(m).on('click', () => { location.hash = `#p/${p.zid}/${p.id}`; }) });
   }
   // tappe vicine: sullo schermo i pin si distanziano di pochi pixel (la posizione reale e il percorso tratteggiato restano quelli veri), così ogni numero si legge
@@ -1029,23 +1043,24 @@ function vGiro() {
   const daRipassare = (x) => ripassare(x.z, x.p);
   // una sola etichetta per tappa, la più importante; l'esito si legge nella riga "Ultimo contatto"
   const etichettaTappa = (x) => nonInteressato(x.z, x.p) ? '<span class="stato-tappa ni">✕ Non interessato</span>'
+    : appuntamento(x.z, x.p) ? (dataIncontro(x.p) && giorni(dataIncontro(x.p)) >= 0 ? '<span class="stato-tappa app">Appuntamento</span>' : etichettaIncontro(x.p))
     : reportCompleto(x.z, x.p) ? '<span class="stato-tappa rc">Report completo</span>'
     : x.p.giro.fatto ? `<span class="stato-tappa consegnata">✓ Consegnato${x.p.giro.fatto_il ? ' il ' + gg(x.p.giro.fatto_il) : ''}</span>`
     : daRipassare(x) ? '<span class="stato-tappa ripassare">↻ Ripassare</span>'
     : contattata(x) ? '<span class="stato-tappa visitata">✓ Visitato</span>' : '<span class="stato-tappa">Visitare</span>';
-  const passa = (x) => (fg.tappa === 'ni' || inLavoro(x)) && (!fg.tappa || (fg.tappa === 'da' ? !x.p.giro.fatto && !contattata(x) : fg.tappa === 'ripassare' ? daRipassare(x) : fg.tappa === 'rc' ? reportCompleto(x.z, x.p) : fg.tappa === 'ni' ? nonInteressato(x.z, x.p) : fg.tappa === 'fatte' ? x.p.giro.fatto : fg.tappa === 'contattate' ? contattata(x) && !x.p.giro.fatto : true))
+  const passa = (x) => (fg.tappa === 'ni' || inLavoro(x)) && (!fg.tappa || (fg.tappa === 'da' ? !x.p.giro.fatto && !contattata(x) : fg.tappa === 'ripassare' ? daRipassare(x) : fg.tappa === 'rc' ? reportCompleto(x.z, x.p) : fg.tappa === 'app' ? appuntamento(x.z, x.p) : fg.tappa === 'ni' ? nonInteressato(x.z, x.p) : fg.tappa === 'fatte' ? x.p.giro.fatto : fg.tappa === 'contattate' ? contattata(x) && !x.p.giro.fatto : true))
     && (!fg.prio || x.p.priorita === fg.prio) && (!fg.nr || nonRiv(x.z, x.p)) && (!fg.pg || x.p.pg === 'assente');
   const tappe = tutte.filter(passa);
   const perZona = {}; tutte.forEach((x) => (perZona[x.zid] = perZona[x.zid] || [])); tappe.forEach((x) => perZona[x.zid].push(x));
   // conteggi dei filtri sulle tappe in lavoro; i non interessati si contano solo nel loro filtro
   const nF = (fn) => tutte.filter((x) => inLavoro(x) && fn(x)).length; const nNI = tutte.length - nF(() => true);
   const chipG = (k, v, lab) => `<button class="chip ${fg[k] === v ? 'on' : ''}" data-fg="${k}" data-v="${esc(v)}">${lab}</button>`;
-  const filtriGiro = tutte.length ? `<div class="filtri mt">${chipG('tappa', '', `Tutte (${nF(() => true)})`)}${chipG('tappa', 'da', `Visitare (${nF((x) => !x.p.giro.fatto && !contattata(x))})`)}${chipG('tappa', 'contattate', `Contattate (${nF((x) => contattata(x) && !x.p.giro.fatto)})`)}${nF((x) => reportCompleto(x.z, x.p)) ? chipG('tappa', 'rc', `Report completo (${nF((x) => reportCompleto(x.z, x.p))})`) : ''}${nNI ? chipG('tappa', 'ni', `Non interessati (${nNI})`) : ''}${nF(daRipassare) ? chipG('tappa', 'ripassare', `Ripassare (${nF(daRipassare)})`) : ''}${chipG('tappa', 'fatte', `Consegnate (${nF((x) => x.p.giro.fatto)})`)}</div>
+  const filtriGiro = tutte.length ? `<div class="filtri mt">${chipG('tappa', '', `Tutte (${nF(() => true)})`)}${chipG('tappa', 'da', `Visitare (${nF((x) => !x.p.giro.fatto && !contattata(x))})`)}${chipG('tappa', 'contattate', `Contattate (${nF((x) => contattata(x) && !x.p.giro.fatto)})`)}${nF((x) => appuntamento(x.z, x.p)) ? chipG('tappa', 'app', `Appuntamenti (${nF((x) => appuntamento(x.z, x.p))})`) : ''}${nF((x) => reportCompleto(x.z, x.p)) ? chipG('tappa', 'rc', `Report completo (${nF((x) => reportCompleto(x.z, x.p))})`) : ''}${nNI ? chipG('tappa', 'ni', `Non interessati (${nNI})`) : ''}${nF(daRipassare) ? chipG('tappa', 'ripassare', `Ripassare (${nF(daRipassare)})`) : ''}${chipG('tappa', 'fatte', `Consegnate (${nF((x) => x.p.giro.fatto)})`)}</div>
   <div class="filtri">${chipG('prio', '', 'Ogni priorità')}${PRIORITA.filter((s) => tutte.some((x) => x.p.priorita === s)).map((s) => chipG('prio', s, prioHtml(s))).join('')}<button class="chip chip-nr ${fg.nr ? 'on' : ''}" data-fgt="nr">Non rivendicate (${nF((x) => nonRiv(x.z, x.p))})</button><button class="chip chip-pg ${fg.pg ? 'on' : ''}" data-fgt="pg">Assenti su PG (${nF((x) => x.p.pg === 'assente')})</button></div>
   ${fg.tappa !== 'ni' && tappe.length < nF(() => true) ? `<div class="sub" style="margin:2px 0 4px">${tappe.length} di ${nF(() => true)} tappe con questi filtri</div>` : ''}` : '';
   const indirizzi = tappe.filter((x) => !x.p.giro.fatto && inLavoro(x)).map((x) => x.p.indirizzo || (x.z.attivita[x.p.pid] || {}).a).filter(Boolean);
   // anteprima su mappa: tappe con coordinate, numerate come nella lista
-  ST.mappaGiro = tappe.map((x) => { const a = x.z.attivita[x.p.pid] || {}; const n = numTappa[x.zid + '|' + x.p.id]; return a.la && a.lo ? { zid: x.zid, id: x.p.id, n, nome: x.p.nome, fatto: !!x.p.giro.fatto, rip: daRipassare(x), rc: reportCompleto(x.z, x.p), ni: nonInteressato(x.z, x.p), vis: contattata(x), la: a.la, lo: a.lo } : null; }).filter(Boolean);
+  ST.mappaGiro = tappe.map((x) => { const a = x.z.attivita[x.p.pid] || {}; const n = numTappa[x.zid + '|' + x.p.id]; return a.la && a.lo ? { zid: x.zid, id: x.p.id, n, nome: x.p.nome, fatto: !!x.p.giro.fatto, rip: daRipassare(x), rc: reportCompleto(x.z, x.p), ni: nonInteressato(x.z, x.p), app: appuntamento(x.z, x.p), vis: contattata(x), la: a.la, lo: a.lo } : null; }).filter(Boolean);
   const senzaCoord = tappe.length - ST.mappaGiro.length;
   const percorso = (arr) => { const dest = arr[arr.length - 1]; const wp = arr.slice(0, -1).slice(0, 9); return `https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${encodeURIComponent(dest)}${wp.length ? '&waypoints=' + encodeURIComponent(wp.join('|')) : ''}`; };
  return `<div class="g-desk"><div class="g-ctrl"><div class="barra-giro"><input type="date" id="gData" class="cerca" value="${d}"><button class="btn" id="gAgg">+ Tappa</button>${tutte.length ? '<button class="btn" id="gSposta">Sposta…</button>' : ''}</div>
@@ -1054,9 +1069,9 @@ function vGiro() {
   ${tappe.length ? `<div class="row mt"><a class="btn ink" href="${indirizzi.length ? percorso(indirizzi) : '#giro'}" target="_blank" rel="noopener">${ico('map')} Percorso a piedi (${indirizzi.length} da visitare)</a></div>
  ${indirizzi.length > 10 ? '<div class="avviso">Google Maps accetta al massimo 10 tappe per percorso: le altre si aprono dalla singola tappa.</div>' : ''}` : ''}</div>
   <div class="g-mappa">${ST.mappaGiro.length ? `<div class="mappa-giro mt" id="mappaGiro" role="img" aria-label="Mappa delle tappe del giro"></div>
-  <div class="sub mappa-legenda"><span class="mg-pin">1</span> visitare <span class="mg-pin vis">2</span> visitato <span class="mg-pin rip">3</span> ripassare <span class="mg-pin rc">4</span> report completo <span class="mg-pin ni">✕</span> non interessato <span class="mg-pin fatto">✓</span> consegnato${senzaCoord ? ` · ${senzaCoord} tappe senza posizione` : ''}</div>` : ''}</div>
+  <div class="sub mappa-legenda"><span class="mg-pin">1</span> visitare <span class="mg-pin vis">2</span> visitato <span class="mg-pin rip">3</span> ripassare <span class="mg-pin app">4</span> appuntamento <span class="mg-pin rc">5</span> report completo <span class="mg-pin ni">✕</span> non interessato <span class="mg-pin fatto">✓</span> consegnato${senzaCoord ? ` · ${senzaCoord} tappe senza posizione` : ''}</div>` : ''}</div>
   <div class="g-lista">${Object.entries(perZona).map(([zid, arr]) => { const tutteZ = tutte.filter((x) => x.zid === zid); return `
-    <div class="eb">${esc(ST.zone[zid].z.meta.quartiere)} · ${tutteZ.length} tappe pianificate · ${tutteZ.filter((x) => x.p.giro.fatto).length} consegnate</div>
+    <div class="eb">${esc(ST.zone[zid].z.meta.quartiere)} · ${tutteZ.length} tappe pianificate · ${tutteZ.filter((x) => x.p.giro.fatto).length} consegnate</div>${tutteZ.length > 1 ? `<div class="row" style="margin:-2px 0 8px"><button class="btn mini" data-gvalore="1">Ordina per valore: i più bassi prima</button></div>` : ''}
     <div class="lista">${arr.map((x) => {
       const ind = x.p.indirizzo || (x.z.attivita[x.p.pid] || {}).a || '';
       const ref = [x.p.referente, x.p.telefono].filter(Boolean).join(' · ');
@@ -1066,7 +1081,7 @@ function vGiro() {
       ${x.p.report && x.p.report.includi === false ? '<span class="sub">senza report</span>' : ''}
       ${sceltaOra(`data-ora="${zid}|${x.p.id}"`, x.p.giro.orario || '')}
       <span class="ordine"><button data-su="${zid}|${x.p.id}" aria-label="Su">↑</button><button data-giu="${zid}|${x.p.id}" aria-label="Giù">↓</button></span></div>
-      <a class="con-mappa" href="#p/${zid}/${x.p.id}">${miniMappa(x.z, x.p)}<div class="card-testo">${testoProspect(x.z, x.p, `<div class="sub ind">${esc(ind.split(',').slice(0, 2).join(','))}${ref ? ' · ' + esc(ref) : ''}</div>`, { senzaRC: true })}</div></a>
+      <a class="con-mappa" href="#p/${zid}/${x.p.id}">${miniPct(x.z, x.p)}<div class="card-testo">${testoProspect(x.z, x.p, `<div class="sub ind">${esc(ind.split(',').slice(0, 2).join(','))}${ref ? ' · ' + esc(ref) : ''}</div>`, { senzaRC: true })}</div></a>
       <div class="row mt"><a class="btn mini" href="https://www.google.com/maps/dir/?api=1&travelmode=walking&destination=${encodeURIComponent(ind)}" target="_blank" rel="noopener">Naviga</a>
       ${x.p.giro.fatto ? `<button class="btn mini" data-annulla="${zid}|${x.p.id}">Riapri tappa</button>` : `<button class="btn mini segna" data-fatto="${zid}|${x.p.id}">Segna consegnato</button>`}
       <button class="btn mini" data-togli="${zid}|${x.p.id}" title="Togli dal giro">✕</button></div></div>`;
@@ -1126,6 +1141,21 @@ function formSpostaGiro() {
     ST.giroData = a; toast(`✓ ${scelte.length} tappe spostate al ${gg(a)} alle ${oraAdesso()}`); chiudiFoglio(); render();
   };
 }
+/* valore di visibilità: % di zone tra i primi 3 su AI Mode (Maps se manca la scansione AI); più è basso, più il prospect è caldo */
+function valoreVis(z, p) {
+  if (!p.pid || !z.punti || !z.punti.length || !z.attivita[p.pid]) return { v: 101, m: 101 };
+  const m = L.metriche(z, p.pid), ai = L.metricheAI(z, p.pid), pm = L.pct(m.top3, m.N);
+  return { v: ai ? L.pct(ai.top3, ai.N) : pm, m: pm };
+}
+const perValore = (a, b) => { const x = valoreVis(a.z, a.p), y = valoreVis(b.z, b.p); return x.v - y.v || x.m - y.m; };
+function ordinaPerValore() {
+  const d = ST.giroData; const zone = new Set();
+  const arr = tutti().filter((x) => x.p.giro && x.p.giro.data === d);
+  for (const zid of new Set(arr.map((x) => x.zid))) {
+    arr.filter((x) => x.zid === zid).sort(perValore).forEach((x, k) => { if (x.p.giro.ordine !== k + 1) { x.p.giro = { ...x.p.giro, ordine: k + 1 }; tocca(x.p, 'giro'); zone.add(zid); } });
+  }
+  zone.forEach((zid) => modificato(zid)); toast(zone.size ? 'Tappe ordinate: valore più basso prima' : 'Tappe già in ordine di valore'); ST.restaScroll = true; render();
+}
 function spostaTappa(zid, id, dir) {
   const d = ST.giroData;
   const arr = tutti().filter((x) => x.zid === zid && x.p.giro && x.p.giro.data === d).sort((a, b) => (a.p.giro.ordine || 99) - (b.p.giro.ordine || 99));
@@ -1135,9 +1165,9 @@ function spostaTappa(zid, id, dir) {
   modificato(zid); ST.restaScroll = true; render();
 }
 function scegliTappa() {
-  const tt = tutti().filter((x) => aperto(x.p) && !(x.p.giro && x.p.giro.data === ST.giroData));
+  const tt = tutti().filter((x) => aperto(x.p) && !(x.p.giro && x.p.giro.data === ST.giroData)).sort(perValore);   // prima i più deboli su AI Mode: sono i più caldi
   const f = apriFoglio('Aggiungi al giro del ' + gg(ST.giroData), `<input class="cerca" id="tq" placeholder="Cerca…"><div class="lista mt" id="tl"></div>`, () => { chiudiFoglio(); render(); });
-  const lista = () => { const q = $('#tq').value.toLowerCase(); $('#tl').innerHTML = tt.filter((x) => (x.p.nome || '').toLowerCase().includes(q)).map((x) => `<button class="card" style="text-align:left" data-add="${x.zid}|${x.p.id}"><div class="nome">${esc(x.p.nome)}</div><div class="sub">${esc(x.p.stato)} · ${esc(x.z.meta.quartiere)}</div></button>`).join(''); };
+  const lista = () => { const q = $('#tq').value.toLowerCase(); $('#tl').innerHTML = tt.filter((x) => (x.p.nome || '').toLowerCase().includes(q)).map((x) => `<button class="card" style="text-align:left" data-add="${x.zid}|${x.p.id}"><div class="nome">${esc(x.p.nome)}</div><div class="sub">${(() => { const w = valoreVis(x.z, x.p); return w.v > 100 ? '' : `${L.haAI(x.z) ? 'AI Mode' : 'Maps'} ${w.v}% · `; })()}${esc(x.p.stato)} · ${esc(x.z.meta.quartiere)}</div></button>`).join(''); };
   $('#tq').oninput = lista; lista();
   f.addEventListener('click', (e) => {
     const b = e.target.closest('[data-add]'); if (!b) return;
@@ -1636,6 +1666,7 @@ function legaVista(v) {
     $('#gData').onchange = (e) => { ST.giroData = e.target.value; render(); };
     $('#gAgg').onclick = scegliTappa;
     const gs = $('#gSposta'); if (gs) gs.onclick = formSpostaGiro;
+    document.querySelectorAll('[data-gvalore]').forEach((b) => (b.onclick = ordinaPerValore));
     V.querySelectorAll('[data-gd]').forEach((b) => (b.onclick = () => { ST.giroData = b.dataset.gd; render(); }));
     // la data selezionata resta sempre in vista al centro della fila, anche con molte date
     { const on = V.querySelector('.date-giro .chip.on'); if (on) { const r = on.parentElement; r.scrollLeft += on.getBoundingClientRect().left - r.getBoundingClientRect().left - (r.clientWidth - on.offsetWidth) / 2; } }
