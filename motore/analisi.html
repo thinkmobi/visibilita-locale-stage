@@ -166,6 +166,10 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
   const up = (n) => { n = Math.max(0, Number(n) || 0); const f = Math.floor(n + 1e-9); return n - f > .5 + 1e-9 ? f + 1 : f; };   // X,5 per difetto
   const it = (n) => up(n).toLocaleString('it-IT');
   const pc = (a, b) => (b ? it(a / b * 100) : '0') + '%';
+  /* articolo davanti a una percentuale: lo 0%, l'1%, l'8%, l'11%, l'80%, il 20% (stessa regola per al, nel, del) */
+  const artP = (prep, v) => { const s = String(up(v)), F = { il: ['lo ', "l'"], al: ['allo ', "all'"], nel: ['nello ', "nell'"], del: ['dello ', "dell'"] }[prep];
+    return s === '0' ? F[0] : /^(1|8|11|18|8\d)$/.test(s) ? F[1] : prep + ' '; };
+  const pv = (a, b) => (b ? a / b * 100 : 0);
   const heat = (r) => !r || r >= 20 ? 'r7' : r === 1 ? 'r1' : r === 2 ? 'r2' : r === 3 ? 'r3' : r <= 6 ? 'r4' : r <= 10 ? 'r5' : 'r6';
   const top3 = (g) => g.flat().filter((r) => r && r <= 3).length;
   const ord = (n, g = 'f') => it(n) + (g === 'm' ? 'º' : 'ª');   // ª con posizione, º con posto
@@ -282,10 +286,10 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
         : best > 3 ? `Da questa zona comparite al massimo in ${ord(best)} posizione: per trovarvi bisogna scorrere la pagina.`
         : `Da questa zona comparite tra i primi 3 solo in ${zone(f.W.t3)} su ${f.W.cnt}: altrove vi si trova solo scorrendo.`);
       add('compTitle' + sfx, f.lead ? `Su ${f.short} avete la quota più alta delle prime 3 posizioni: ${it(f.ME.v)}%`
-        : `Su ${f.short} avete il ${it(f.ME.v)}% delle prime 3 posizioni: in testa si arriva al ${it(f.L0.v)}%`);
+        : `Su ${f.short} avete ${artP('il', f.ME.v)}${it(f.ME.v)}% delle prime 3 posizioni: in testa si arriva ${artP('al', f.L0.v)}${it(f.L0.v)}%`);
     });
     if (AI && MP) {
-      add('aiTitle', `Tra le prime 3 posizioni nel ${pc(AI.t3, AI.pts)} dei punti su Google AI Mode e nel ${pc(MP.t3, MP.pts)} su Maps`);
+      add('aiTitle', `Tra le prime 3 posizioni ${artP('nel', pv(AI.t3, AI.pts))}${pc(AI.t3, AI.pts)} dei punti su Google AI Mode e ${artP('nel', pv(MP.t3, MP.pts))}${pc(MP.t3, MP.pts)} su Maps`);
       add('aiTxt', (lost ? `In ${zone(lost)} Google Maps vi mette tra i primi 3 e AI Mode no. ` : '') + (sedeAI ? `Dalla vostra sede AI Mode vi cita al ${ord(sedeAI, 'm')} posto.` : 'Dalla vostra sede AI Mode non vi cita.'));
     }
     /* punti deboli: al massimo 3, in ordine di peso; la scheda non rivendicata va sempre per prima */
