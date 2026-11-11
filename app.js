@@ -1,7 +1,7 @@
 /* Visibilità locale: gestione prospect, giro e stampe. Dati in un repository GitHub privato,
    copia locale in IndexedDB per lavorare offline. Nessun dato vive nel repository dell'app. */
 'use strict';
-const VERSIONE = '0.42.0';
+const VERSIONE = '0.42.1';
 /* versione in fondo allo splash di avvio, senza la «v» (che compare solo nel Profilo) */
 /* ambiente: lo decide l'indirizzo dell'app (…/visibilita-locale-stage/ è stage, il resto è produzione) */
 const AMBIENTE = /-stage\//.test(location.pathname) ? 'stage' : 'prod';
@@ -618,6 +618,21 @@ function chiudiFoglio() {
   // aggiornamenti arrivati mentre il foglio era aperto: si mostrano adesso
   if (ST.daRender) { ST.daRender = false; ST.restaScroll = true; setTimeout(render, 0); }
 }
+/* distanza dal bordo dei segnalini di Local Falcon nello sfondo (come pad_sfondo in motore/foglio.py):
+   dipende dal raggio della zona (2 km 20,3%, 3 km 5,5%). Se la griglia non si riconosce resta il 20,3% */
+async function griglaSfondo(url, n) {
+  const im = await new Promise((ok, ko) => { const i = new Image(); i.onload = () => ok(i); i.onerror = ko; i.src = url; });
+  const W = im.naturalWidth, H = im.naturalHeight, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(im, 0, 0); const px = cx.getImageData(0, 0, W, H).data;
+  const col = new Float64Array(W), row = new Float64Array(H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const o = (y * W + x) * 4, mx = Math.max(px[o], px[o + 1], px[o + 2]), mn = Math.min(px[o], px[o + 1], px[o + 2]);
+    if (mx > 90 && mx && (mx - mn) / mx * 255 > 140) { col[x]++; row[y]++; } }
+  const bande = (v, L, T) => { const g = []; v.forEach((c, i) => { if (c / T * 255 > 25) { const u = g[g.length - 1]; if (u && i - u[u.length - 1] <= 2) u.push(i); else g.push([i]); } });
+    return g.filter((a) => a.length >= 12).map((a) => (a[0] + a[a.length - 1]) / 2 / L); };
+  const bx = bande(col, W, H), by = bande(row, H, W);
+  const first = bx.length === n && by.length === n && Math.abs(bx[0] - by[0]) < .01 ? (bx[0] + by[0]) / 2 : .203;
+  return { first, step: (1 - 2 * first) / Math.max(1, n - 1) };
+}
 function minigriglia(z, pid, opz = {}) {
   const m = opz.ai ? L.metricheAI(z, pid) : L.metriche(z, pid); const n = z.meta.griglia || Math.round(Math.sqrt(m.N));
   // punti ordinati da nord-ovest a sud-est per la visualizzazione
@@ -700,7 +715,7 @@ async function apriAnalisi(zid, pid) {
     <div id="anEsito" class="sub mt"></div>`, () => { if (ST.indietro) location.hash = ST.indietro; else history.back(); });
   const fr = $('#anFrame', f);
   const disegna = () => { const w = fr.contentWindow; if (!w || !w.disegna) return;
-    const r = w.disegna({ data: { ...data, mapImg: st.img }, testi: st.testi, filtro: st.filtro }); st.base = r.base || {};
+    const r = w.disegna({ data: { ...data, mapImg: st.img, ...(st.mg ? { mapGrid: st.mg } : {}) }, testi: st.testi, filtro: st.filtro }); st.base = r.base || {};
     fr.style.height = Math.max(200, w.document.body.scrollHeight + 4) + 'px'; };
   fr.addEventListener('load', disegna);
   addEventListener('resize', () => { if (document.body.contains(fr)) disegna(); });
@@ -742,7 +757,7 @@ async function apriAnalisi(zid, pid) {
   if (GH.ok()) {
     // prima l'elenco della zona: niente richieste a file che non ci sono (404)
     GH.list(`zone/${zid}`).then(async (zl) => { const zn = (zl || []).map((x) => x.name);
-      if (zn.includes('sfondo.png')) GH.getBlob(`zone/${zid}/sfondo.png`).then((bl) => { if (bl && document.body.contains(fr)) { st.img = URL.createObjectURL(bl); disegna(); } }).catch(() => {});
+      if (zn.includes('sfondo.png')) GH.getBlob(`zone/${zid}/sfondo.png`).then(async (bl) => { if (bl && document.body.contains(fr)) { st.img = URL.createObjectURL(bl); st.mg = await griglaSfondo(st.img, z.meta.griglia || 7).catch(() => null); disegna(); } }).catch(() => {});
       return zn.includes('analisi') ? GH.list(dir) : [];
     }).then(async (el) => { const nomi = (el || []).map((x) => x.name);
       if (nomi.includes(`${k}-testi.json`)) { const t = await GH.getJSON(`${dir}/${k}-testi.json`).catch(() => null); if (t) { st.testi = t.data.testi || {}; st.sha = t.sha; disegna(); } }

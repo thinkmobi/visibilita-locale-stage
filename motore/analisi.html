@@ -197,9 +197,11 @@ body.pdf .slide{width:1600px;border-radius:0;box-shadow:none;break-after:page}
     /* griglia delle posizioni; bgmap: la mappa reale solo nelle slide con i dati veri */
     function gridSVG(rows, { hl = null, labels = true, dim = false, deco = true, neutral = false, dims = null, aria = '', bgmap = null } = {}) {
       const n = rows.length, s = 10, w = n * s, c = w / 2, m = Math.floor(n / 2) * s + s / 2, pd = dims ? 13 : 3, R = bgmap ? 3 : 4.1, fs = bgmap ? 3.3 : 4, hr = bgmap ? 4.6 : 5.8, id = 'mc' + (++gid);
-      let out = `<svg class="grid" viewBox="${-pd} -3 ${w + pd + 3} ${w + pd + 3}" role="img" aria-label="${esc(aria)}">`;
-      if (bgmap) { const k = s / MG.step, ix = s / 2 - MG.first * k;
-        out += `<defs><clipPath id="${id}"><rect x="-3" y="-3" width="${w + 6}" height="${w + 6}"/></clipPath></defs><image href="${bgmap}" x="${ix.toFixed(2)}" y="${ix.toFixed(2)}" width="${k.toFixed(2)}" height="${k.toFixed(2)}" preserveAspectRatio="none" clip-path="url(#${id})"/>`; }
+      // con la mappa reale il riquadro si ferma dove finisce l'immagine: niente cornice bianca sulle zone a raggio ampio
+      const bk = bgmap ? s / MG.step : 0, bix = bgmap ? s / 2 - MG.first * bk : 0, v0 = bgmap ? Math.max(-3, bix) : -3, v1 = bgmap ? Math.min(w + 3, bix + bk) : w + 3;
+      let out = `<svg class="grid" viewBox="${bgmap ? v0.toFixed(2) : -pd} ${v0.toFixed(2)} ${bgmap ? (v1 - v0).toFixed(2) : w + pd + 3} ${bgmap ? (v1 - v0).toFixed(2) : w + pd + 3}" role="img" aria-label="${esc(aria)}">`;
+      if (bgmap) { const k = bk, ix = bix;
+        out += `<defs><clipPath id="${id}"><rect x="${v0.toFixed(2)}" y="${v0.toFixed(2)}" width="${(v1 - v0).toFixed(2)}" height="${(v1 - v0).toFixed(2)}"/></clipPath></defs><image href="${bgmap}" x="${ix.toFixed(2)}" y="${ix.toFixed(2)}" width="${k.toFixed(2)}" height="${k.toFixed(2)}" preserveAspectRatio="none" clip-path="url(#${id})"/>`; }
       else if (deco) out += contours(c, c, w * 0.78, w * 0.065, 1.3);
       rows.forEach((row, y) => row.forEach((r, x) => {
         const cx = x * s + s / 2, cy = y * s + s / 2, cls = heat(r), off = dim && hl && !hl(y, x), op = off && !bgmap ? .22 : 1;
