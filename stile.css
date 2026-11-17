@@ -327,7 +327,7 @@ body.desk .brand{font-size:21px}
 body.desk .vista{grid-column:2;grid-row:2;padding:22px 28px 36px}
 body.desk .tab{grid-column:1;grid-row:1/3;flex-direction:column;gap:2px;border-top:0;border-right:1px solid var(--line);padding:0 10px 14px;overflow-y:auto}
 body.desk .tab-brand{display:flex;align-items:center;gap:10px;height:var(--top-h);margin:0 -10px 10px;padding:0 18px;border-bottom:1px solid var(--line);font:700 17px 'Space Grotesk',system-ui,sans-serif;white-space:nowrap}
-body.desk .tab-brand .logo{width:24px;height:24px}
+body.desk .tab-brand .logo{width:auto;height:22px}
 body.desk .tab a{flex:none;flex-direction:row;align-items:center;gap:12px;padding:9px 12px;border-radius:8px;font-size:14px;color:#3C4743}
 body.desk .tab a:hover{background:var(--bg)}
 body.desk .tab a.on{background:var(--top-t);color:#1A7536}
